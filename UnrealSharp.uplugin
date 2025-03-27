@@ -13,6 +13,7 @@
 	"IsBetaVersion": true,
 	"IsExperimentalVersion": false,
 	"Installed": false,
+	"ManagedPlugin": true,
 	"Modules": [
 		{
 			"Name": "UnrealSharpCore",
@@ -42,6 +43,11 @@
 		{
 			"Name": "UnrealSharpBinds",
 			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "UnrealSharpPlugins",
+			"Type": "Editor",
 			"LoadingPhase": "Default"
 		}
 	],

@@ -22,6 +22,7 @@
 #include "UnrealSharpCore/CSManager.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Interfaces/IMainFrameModule.h"
+#include "Interfaces/IPluginManager.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/DebuggerCommands.h"
 #include "Logging/StructuredLog.h"
@@ -45,22 +46,6 @@ void FUnrealSharpEditorModule::StartupModule()
 {
 	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
 	AssetTools.RegisterAssetTypeActions(MakeShared<FCSAssetTypeAction_CSBlueprint>());
-
-	FString FullScriptPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / "Script");
-	if (!FPaths::DirectoryExists(FullScriptPath))
-	{
-		FPlatformFileManager::Get().GetPlatformFile().CreateDirectory(*FullScriptPath);
-	}
-
-	FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>("DirectoryWatcher");
-	IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
-	FDelegateHandle Handle;
-	
-	//Bind to directory watcher to look for changes in C# code.
-	DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(
-		FullScriptPath,
-		IDirectoryWatcher::FDirectoryChanged::CreateRaw(this, &FUnrealSharpEditorModule::OnCSharpCodeModified),
-		Handle);
 	
 	Manager = &UCSManager::GetOrCreate();
 	Manager->OnNewStructEvent().AddRaw(this, &FUnrealSharpEditorModule::OnStructRebuilt);
@@ -90,6 +75,7 @@ void FUnrealSharpEditorModule::StartupModule()
 	RegisterMenu();
 	RegisterGameplayTags();
 	RegisterCollisionProfile();
+	RegisterPlugins();
 
 	if (UAssetManager::IsInitialized())
 	{
@@ -471,6 +457,16 @@ void FUnrealSharpEditorModule::OnRefreshRuntimeGlue()
 	OnRefreshRuntimeGlueDelegate.Broadcast();
 }
 
+void FUnrealSharpEditorModule::OnRefreshPluginListeners()
+{
+	RegisterPlugins();
+}
+
+void FUnrealSharpEditorModule::OnCreatePlugin()
+{
+	
+}
+
 void FUnrealSharpEditorModule::OnRepairComponents()
 {
 	RepairComponents();
@@ -542,7 +538,6 @@ void FUnrealSharpEditorModule::OpenSolution()
 	
 	FString OpenSolutionArgs = FString::Printf(TEXT("/c \"%s\""), *SolutionPath);
 	FPlatformProcess::CreateProc(TEXT("cmd.exe"), *OpenSolutionArgs, true, true, false, nullptr, 0, nullptr, nullptr);
-
 };
 
 FString FUnrealSharpEditorModule::SelectArchiveDirectory()
@@ -628,6 +623,16 @@ TSharedRef<SWidget> FUnrealSharpEditorModule::GenerateUnrealSharpMenu()
 
 	MenuBuilder.AddMenuEntry(CSCommands.RepairComponents, NAME_None, TAttribute<FText>(), TAttribute<FText>(),
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Refresh"));
+
+	MenuBuilder.EndSection();
+
+	MenuBuilder.BeginSection("Plugins", LOCTEXT("Plugins", "Plugins"));
+
+	MenuBuilder.AddMenuEntry(CSCommands.CreatePlugin, NAME_None, TAttribute<FText>(), TAttribute<FText>(),
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Recompile"));
+	
+	MenuBuilder.AddMenuEntry(CSCommands.RefreshScriptListeners, NAME_None, TAttribute<FText>(), TAttribute<FText>(),
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Refresh"));
 	
 	return MenuBuilder.MakeWidget();
 }
@@ -687,6 +692,9 @@ void FUnrealSharpEditorModule::RegisterCommands()
 	UnrealSharpCommands->MapAction(FCSCommands::Get().ReportBug, FExecuteAction::CreateStatic(&FUnrealSharpEditorModule::OnReportBug));
 	UnrealSharpCommands->MapAction(FCSCommands::Get().RefreshRuntimeGlue, FExecuteAction::CreateRaw(this, &FUnrealSharpEditorModule::OnRefreshRuntimeGlue));
 	UnrealSharpCommands->MapAction(FCSCommands::Get().RepairComponents, FExecuteAction::CreateStatic(&FUnrealSharpEditorModule::OnRepairComponents));
+	
+	UnrealSharpCommands->MapAction(FCSCommands::Get().RefreshScriptListeners, FExecuteAction::CreateRaw(this, &FUnrealSharpEditorModule::OnRefreshPluginListeners));
+	UnrealSharpCommands->MapAction(FCSCommands::Get().CreatePlugin, FExecuteAction::CreateRaw(this, &FUnrealSharpEditorModule::OnCreatePlugin));
 
 	const FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
 	const TSharedRef<FUICommandList> Commands = LevelEditorModule.GetGlobalLevelEditorActions();
@@ -736,6 +744,49 @@ void FUnrealSharpEditorModule::RegisterCollisionProfile()
 	UCollisionProfile* CollisionProfile = UCollisionProfile::Get();
 	CollisionProfile->OnLoadProfileConfig.AddRaw(this, &FUnrealSharpEditorModule::OnCollisionProfileLoaded);
 	ProcessTraceTypeQuery();
+}
+
+void FUnrealSharpEditorModule::RegisterPlugins()
+{
+	FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>("DirectoryWatcher");
+	IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
+	
+	auto AddActiveScriptFolders = [this, DirectoryWatcher](const FString& Folder)
+	{
+		if (!ActiveScriptFolders.Contains(Folder))
+		{
+			ActiveScriptFolders.Add(Folder);
+			
+			FDelegateHandle Handle;
+			//Bind to directory watcher to look for changes in C# code.
+			DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(
+				Folder,
+				IDirectoryWatcher::FDirectoryChanged::CreateRaw(this, &FUnrealSharpEditorModule::OnCSharpCodeModified),
+				Handle);
+		}
+	};
+	
+	FString ProjectScriptFolder = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Script"));
+	
+	if (!FPaths::DirectoryExists(ProjectScriptFolder))
+	{
+		FPlatformFileManager::Get().GetPlatformFile().CreateDirectory(*ProjectScriptFolder);
+	}
+	
+	AddActiveScriptFolders(ProjectScriptFolder);
+	
+	IFileManager& FileManager = IFileManager::Get();
+	IPluginManager& PluginManager = IPluginManager::Get();
+		
+	for (TSharedRef<IPlugin>& Plugin : PluginManager.GetEnabledPlugins())
+	{
+		FString ScriptPath = FPaths::ConvertRelativePathToFull(Plugin->GetBaseDir() / TEXT("Script"));
+			
+		if (FileManager.DirectoryExists(*ScriptPath) && ScriptPath != ProjectScriptFolder)
+		{
+			AddActiveScriptFolders(ScriptPath);
+		}
+	}
 }
 
 void FUnrealSharpEditorModule::SaveRuntimeGlue(const FCSScriptBuilder& ScriptBuilder, const FString& FileName, const FString& Suffix)

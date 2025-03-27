@@ -69,6 +69,8 @@ private:
     static void OnReportBug();
     
     void OnRefreshRuntimeGlue();
+    void OnRefreshPluginListeners();
+    void OnCreatePlugin();
 
     static void OnRepairComponents();
     
@@ -89,6 +91,7 @@ private:
     void RegisterGameplayTags();
     void TryRegisterAssetTypes();
     void RegisterCollisionProfile();
+    void RegisterPlugins();
 
     void OnAssetSearchRootAdded(const FString& RootPath);
     void OnCompletedInitialScan();
@@ -144,6 +147,8 @@ private:
     TSet<UScriptStruct*> RebuiltStructs;
     TSet<UClass*> RebuiltClasses;
     TSet<UEnum*> RebuiltEnums;
+
+    TArray<FString> ActiveScriptFolders;
     
     UCSManager* Manager = nullptr;
     bool bDirtyGlue = false;

@@ -24,5 +24,7 @@ public:
 	TSharedPtr<FUICommandInfo> ReportBug;
 	TSharedPtr<FUICommandInfo> RefreshRuntimeGlue;
 	TSharedPtr<FUICommandInfo> RepairComponents;
+	TSharedPtr<FUICommandInfo> RefreshScriptListeners;
+	TSharedPtr<FUICommandInfo> CreatePlugin;
 };
 
