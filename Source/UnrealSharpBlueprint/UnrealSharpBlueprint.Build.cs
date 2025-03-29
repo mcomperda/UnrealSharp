@@ -19,6 +19,7 @@ public class UnrealSharpBlueprint : ModuleRules
                 "CoreUObject",
                 "Engine",
                 "UnrealSharpCore",
+                "UnrealSharpExtensions",
                 "BlueprintGraph"
             }
         );

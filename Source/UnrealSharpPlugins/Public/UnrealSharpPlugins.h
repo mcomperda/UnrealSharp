@@ -5,7 +5,7 @@
 
 class FCSPluginWizardDefinition;
 
-UNREALSHARPPLUGINS_API namespace UnrealSharpPlugins
+namespace UnrealSharpPlugins
 {
     inline static const FName PluginTabName = FName(TEXT("UnrealSharpPlugins"));
 }

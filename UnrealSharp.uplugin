@@ -49,6 +49,11 @@
 			"Name": "UnrealSharpPlugins",
 			"Type": "Editor",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "UnrealSharpExtensions",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	],
 	"SupportedTargetPlatforms": [

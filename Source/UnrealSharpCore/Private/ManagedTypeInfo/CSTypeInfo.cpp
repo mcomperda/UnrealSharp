@@ -1,0 +1,1 @@
+﻿#include "ManagedTypeInfo/CSTypeInfo.h"

@@ -21,7 +21,8 @@ public class UnrealSharpPlugins : ModuleRules
                 "Engine",
                 "Slate",
                 "SlateCore", 
-                "GameProjectGeneration"
+                "GameProjectGeneration",
+                "Projects"
             }
         );
     }
