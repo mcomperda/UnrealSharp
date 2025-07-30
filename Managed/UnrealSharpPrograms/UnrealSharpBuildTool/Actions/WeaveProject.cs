@@ -32,7 +32,7 @@ public class WeaveProject : BuildToolAction
         }
         
         BuildToolProcess weaveProcess = new BuildToolProcess();
-        weaveProcess.StartInfo.ArgumentList.Add(weaverPath);
+        weaveProcess.StartInfo.AddPath(weaverPath);
         weaveProcess.StartInfo.WorkingDirectory = Directory.GetCurrentDirectory();
         
         bool foundValidProject = false;
@@ -43,7 +43,7 @@ public class WeaveProject : BuildToolAction
             string assemblyPath = Path.Combine(projectFile.DirectoryName!, "bin", 
                 Program.GetBuildConfiguration(), Program.GetVersion(), csProjName + ".dll");
             
-            weaveProcess.StartInfo.ArgumentList.Add(assemblyPath);
+            weaveProcess.StartInfo.AddPath(assemblyPath);
             foundValidProject = true;
         }
         
@@ -55,8 +55,7 @@ public class WeaveProject : BuildToolAction
 
         // Add path to the output folder for the weaver.
         weaveProcess.StartInfo.ArgumentList.Add("-o");
-        weaveProcess.StartInfo.ArgumentList.Add($"{Program.FixPath(_outputDirectory)}");
-        
+        weaveProcess.StartInfo.AddPath(_outputDirectory);        
         return weaveProcess.StartBuildToolProcess();
     }
 }

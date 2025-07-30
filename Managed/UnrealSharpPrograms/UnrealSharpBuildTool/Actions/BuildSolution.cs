@@ -10,7 +10,7 @@ public class BuildSolution : BuildToolAction
     
     public BuildSolution(string folder, Collection<string>? extraArguments = null, BuildConfig buildConfig = BuildConfig.Debug)
     {
-        _folder = Program.FixPath(folder);
+        _folder = PathUtils.GetNormalizedPath(folder);
         _buildConfig = buildConfig;
         _extraArguments = extraArguments;
     }
@@ -33,7 +33,7 @@ public class BuildSolution : BuildToolAction
             buildSolutionProcess.StartInfo.ArgumentList.Add("build");
         }
         
-        buildSolutionProcess.StartInfo.ArgumentList.Add($"{_folder}");
+        buildSolutionProcess.StartInfo.AddPath(_folder);
         
         buildSolutionProcess.StartInfo.ArgumentList.Add("--configuration");
         buildSolutionProcess.StartInfo.ArgumentList.Add(Program.GetBuildConfiguration(_buildConfig));

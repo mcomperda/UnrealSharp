@@ -109,16 +109,6 @@ public static class Program
         return BuildToolOptions.ProjectDirectory;
     }
 
-    public static string FixPath(string path)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return path.Replace('/', '\\');
-        }
-
-        return path;
-    }
-
     public static string GetProjectNameAsManaged()
     {
         return "Managed" + BuildToolOptions.ProjectName;
@@ -164,7 +154,8 @@ public static class Program
         {
             executablePath = Path.Combine(Program.BuildToolOptions.EngineDirectory, "Binaries", "Mac", "UnrealEditor");
         }
-        string commandLineArgs = Program.FixPath(Program.GetUProjectFilePath());
+
+        string commandLineArgs = PathUtils.GetEscapedPath(Program.GetUProjectFilePath());
 
         // Create a new profile if it doesn't exist
         if (root.Profiles == null)
@@ -176,7 +167,7 @@ public static class Program
         {
             CommandName = "Executable",
             ExecutablePath = executablePath,
-            CommandLineArgs = $"\"{commandLineArgs}\"",
+            CommandLineArgs = commandLineArgs,
         };
 
         string newJsonString = JsonConvert.SerializeObject(root, Newtonsoft.Json.Formatting.Indented);

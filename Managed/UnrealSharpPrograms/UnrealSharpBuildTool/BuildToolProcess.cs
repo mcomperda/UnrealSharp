@@ -17,34 +17,47 @@ public class BuildToolProcess : Process
             {
                 fileName = Program.BuildToolOptions.DotNetPath;
             }
-        }
-        
+        }                
+
         StartInfo.FileName = fileName;
         StartInfo.RedirectStandardOutput = true;
         StartInfo.RedirectStandardError = true;
         StartInfo.UseShellExecute = false;
         StartInfo.CreateNoWindow = true;
+        
     }
 
     private void WriteOutProcess()
     {
-        string command = StartInfo.FileName;
+        string command = StartInfo.FileName;       
         string arguments = string.Join(" ", StartInfo.ArgumentList);
-        Console.WriteLine($"Command: {command} {arguments}");
+        var commandLine = $"Command: {command} {arguments}";
+        Console.WriteLine();
+        Console.WriteLine(commandLine);        
     }
-    
+   
     public bool StartBuildToolProcess()
     {
         try
         {
             if (!Start())
             {
+                WaitForExit();
                 throw new Exception("Failed to start process");
             }
             
             WriteOutProcess();
 
             StringBuilder output = new();
+
+            ErrorDataReceived += (sender, args) =>
+            {
+                if (args.Data != null)
+                {
+                    Console.Error.WriteLine(args.Data);
+                }
+            };
+
             OutputDataReceived += (sender, args) =>
             {
                 if (args.Data != null)
@@ -62,7 +75,7 @@ public class BuildToolProcess : Process
 
             if (ExitCode != 0)
             {
-                throw new Exception($"Error in executing build command {StartInfo.Arguments}: {Environment.NewLine + error + Environment.NewLine + output}");
+                throw new Exception($"Error in executing build command. FileName: {StartInfo.FileName}, WorkingDirectory: {StartInfo.WorkingDirectory} Args: {string.Join(",", StartInfo.ArgumentList)}: {Environment.NewLine + error + Environment.NewLine + output}");
             }
         }
         catch (Exception ex)
