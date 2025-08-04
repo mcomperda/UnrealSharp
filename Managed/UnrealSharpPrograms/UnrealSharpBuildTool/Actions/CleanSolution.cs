@@ -1,18 +1,18 @@
 ﻿namespace UnrealSharpBuildTool.Actions;
 
-public class CleanSolution : BuildToolAction
+public class CleanSolution(BuildToolContext ctx) : BuildToolAction(ctx)
 {
-    public override bool RunAction()
-    {
-        BuildToolProcess cleanProcess = new BuildToolProcess();
+    protected override bool DoRunAction()
+    {        
+        var unrealSharpBinaries = _context.Paths.GetManagedBinariesPublishDirectory();
 
-        string unrealSharpBinaries = Program.GetOutputPath();
+        _context.Logger.Info($"Deleting folder at: {unrealSharpBinaries.FullName}");
 
-        if (Directory.Exists(unrealSharpBinaries))
+        if (unrealSharpBinaries.Exists)
         {
-            Directory.Delete(unrealSharpBinaries, true);
+            unrealSharpBinaries.Delete(true);            
         }
         
-        return cleanProcess.StartBuildToolProcess();
+        return true;
     }
 }

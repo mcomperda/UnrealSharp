@@ -2,18 +2,18 @@
 
 namespace UnrealSharpBuildTool.Actions;
 
-public class RebuildSolution : BuildToolAction
+public class RebuildSolution(BuildToolContext ctx) : BuildToolAction(ctx)
 {
-    public override bool RunAction()
+    protected override bool DoRunAction()
     {
-        CleanSolution cleanSolutionProcess = new CleanSolution();
+        var clean = new CleanSolution(_context);
         
-        if (!cleanSolutionProcess.RunAction())
+        if (!clean.RunAction())
         {
             return false;
         }
 
-        BuildSolution buildSolution = new BuildUserSolution();
+        var buildSolution = new BuildUserSolution(_context);
         
         if (!buildSolution.RunAction())
         {

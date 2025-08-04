@@ -1,17 +1,20 @@
-﻿using Mono.Cecil;
+﻿using LanguageExt;
+using Mono.Cecil;
 using UnrealSharpWeaver.MetaData;
 
 namespace UnrealSharpWeaver.TypeProcessors;
 
-public static class UnrealEnumProcessor
+public class UnrealEnumProcessor(WeaverImporter importer) : BaseProcessor(importer)
 { 
-    public static void ProcessEnums(List<TypeDefinition> foundEnums, ApiMetaData assemblyMetadata)
+    public void ProcessEnums(List<TypeDefinition> foundEnums, ApiMetaData assemblyMetadata)
     {
         assemblyMetadata.EnumMetaData.Capacity = foundEnums.Count;
         
         for (var i = 0; i < foundEnums.Count; i++)
         {
-            assemblyMetadata.EnumMetaData.Add(new EnumMetaData(foundEnums[i]));
+            var found = foundEnums[i];
+            assemblyMetadata.EnumMetaData.Add(new EnumMetaData(_importer, found));
+            _importer.Logger.Info($"Processed enum '{found.FullName}'");
         }
     }
 }

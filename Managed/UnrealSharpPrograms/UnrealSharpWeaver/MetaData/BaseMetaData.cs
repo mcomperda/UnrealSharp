@@ -16,10 +16,14 @@ public class BaseMetaData
     public readonly IMemberDefinition MemberDefinition;
     public readonly CustomAttribute? BaseAttribute;
     public readonly string SourceName;
+
+    protected readonly WeaverImporter _importer;
+
     // End non-serialized
 
-    public BaseMetaData(MemberReference member, string attributeName)
+    public BaseMetaData(WeaverImporter importer, MemberReference member, string attributeName)
     {
+        _importer = importer;
         MemberDefinition = member.Resolve();
         SourceName = MemberDefinition.Name;
         Name = MemberDefinition.GetEngineName();

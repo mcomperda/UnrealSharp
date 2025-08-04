@@ -1,35 +1,29 @@
 ﻿namespace UnrealSharpBuildTool.Actions;
 
-public class BuildWeave : BuildToolAction
+public class BuildWeave(BuildToolContext ctx) : BuildToolAction(ctx)
 {
-    public override bool RunAction()
+    protected override bool DoRunAction()
     {
-        BuildSolution buildSolution = new BuildUserSolution();
-        WeaveProject weaveProject = new WeaveProject();
+        var buildSolution = new BuildUserSolution(_context);
+        var weaveProject = new WeaveProject(_context);
         return buildSolution.RunAction() && weaveProject.RunAction() && AddLaunchSettings();
     } 
+
     bool AddLaunchSettings()
     {
-        List<FileInfo> allProjectFiles = Program.GetAllProjectFiles(new DirectoryInfo(Program.GetScriptFolder()));
+        var allProjectFiles = _context.Paths.GetWeavableProjectFiles();
+        var filteredProjectFiles = allProjectFiles.Where(p => p.DirectoryName != null && !p.DirectoryName.Equals(BuildToolConstants.GlueProjectName));
 
-        foreach (FileInfo projectFile in allProjectFiles)
-        {
-            if (projectFile.Directory!.Name == "ProjectGlue")
+        foreach (FileInfo projectFile in filteredProjectFiles)
+        {                                    
+            if(projectFile.Directory == null)
             {
+                _context.Logger.Warning($"Project file {projectFile.FullName} does not have a valid directory. Skipping launch settings addition.");
                 continue;
             }
-            string csProjectPath = Path.Combine(Program.GetScriptFolder(), projectFile.Directory.Name);
-            string propertiesDirectoryPath = Path.Combine(csProjectPath, "Properties");
-            string launchSettingsPath = Path.Combine(propertiesDirectoryPath, "launchSettings.json");
-            if (!Directory.Exists(propertiesDirectoryPath))
-            {
-                Directory.CreateDirectory(propertiesDirectoryPath);
-            }
-            if (File.Exists(launchSettingsPath))
-            {
-                return true;
-            }
-            Program.CreateOrUpdateLaunchSettings(launchSettingsPath);
+
+            var projectFileManager = new BuildToolProjectFileManager(projectFile.Directory, projectFile, _context.Options, _context.Paths, _context.Logger);
+            projectFileManager.AddLaunchSettings();            
         }
         return true;
     }

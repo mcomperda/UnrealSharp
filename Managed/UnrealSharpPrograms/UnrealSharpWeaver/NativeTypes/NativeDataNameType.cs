@@ -2,4 +2,4 @@
 
 namespace UnrealSharpWeaver.NativeTypes;
 
-class NativeDataNameType(TypeReference structType, int arrayDim) : NativeDataBlittableStructTypeBase(structType, arrayDim, PropertyType.Name);
+class NativeDataNameType(WeaverImporter importer, TypeReference structType, int arrayDim) : NativeDataBlittableStructTypeBase(importer, structType, arrayDim, PropertyType.Name);

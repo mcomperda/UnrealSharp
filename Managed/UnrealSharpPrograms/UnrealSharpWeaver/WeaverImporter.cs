@@ -1,14 +1,13 @@
 ﻿using Mono.Cecil;
 using Mono.Cecil.Rocks;
+using UnrealSharp.Tools;
+using UnrealSharpWeaver.TypeProcessors;
 using UnrealSharpWeaver.Utilities;
 
 namespace UnrealSharpWeaver;
 
-public class WeaverImporter
-{
-    private static WeaverImporter? _instance;
-    public static WeaverImporter Instance => _instance ??= new WeaverImporter();
-
+public partial class WeaverImporter
+{    
     private const string Attributes = ".Attributes";
 
     public const string UnrealSharpNamespace = "UnrealSharp";
@@ -34,13 +33,40 @@ public class WeaverImporter
     public const string UStructCallbacks = "UStructExporter";
 
     public const string GeneratedTypeAttribute = "GeneratedTypeAttribute";
-    
-    public MethodReference? UFunctionAttributeConstructor => UnrealSharpAssembly.FindType("UFunctionAttribute", "UnrealSharp.Attributes")?.FindMethod(".ctor");
-    public MethodReference? BlueprintInternalUseAttributeConstructor => UnrealSharpAssembly.FindType("BlueprintInternalUseOnlyAttribute", "UnrealSharp.Attributes.MetaTags")?.FindMethod(".ctor");
+        
+    public MethodReference? UFunctionAttributeConstructor => FindType(UnrealSharpAssembly, "UFunctionAttribute", "UnrealSharp.Attributes")?.FindMethod(this, ".ctor");
+    public MethodReference? BlueprintInternalUseAttributeConstructor => FindType(UnrealSharpAssembly, "BlueprintInternalUseOnlyAttribute", "UnrealSharp.Attributes.MetaTags")?.FindMethod(this, ".ctor");
     
     public AssemblyDefinition UserAssembly = null!;
     public readonly ICollection<AssemblyDefinition> WeavedAssemblies = [];
-    
+
+    public WeaverOptions Options { get; }
+    public ToolLogger Logger { get; }
+
+    public UnrealEnumProcessor UnrealEnumProcessor { get; }
+    public UnrealInterfaceProcessor UnrealInterfaceProcessor { get; }
+    public UnrealStructProcessor UnrealStructProcessor { get; }
+    public UnrealClassProcessor UnrealClassProcessor { get; }
+    public UnrealDelegateProcessor UnrealDelegateProcessor { get; }
+    public FunctionProcessor FunctionProcessor { get; }
+    public ConstructorBuilder ConstructorBuilder { get; }
+    public PropertyProcessor PropertyProcessor { get; }
+
+    public WeaverImporter(WeaverOptions options, ToolLogger logger)
+    {
+        Options = options;
+        Logger = logger;
+
+        UnrealEnumProcessor = new(this);
+        UnrealInterfaceProcessor = new(this);
+        UnrealStructProcessor = new(this);
+        UnrealClassProcessor = new(this);
+        UnrealDelegateProcessor = new(this);
+        FunctionProcessor = new(this);
+        ConstructorBuilder = new(this);
+        PropertyProcessor = new(this);
+    }
+
     public AssemblyDefinition UnrealSharpAssembly => FindAssembly(UnrealSharpNamespace);
     public AssemblyDefinition UnrealSharpCoreAssembly => FindAssembly(UnrealSharpNamespace + ".Core");
     public AssemblyDefinition ProjectGlueAssembly => FindAssembly("ProjectGlue");
@@ -83,16 +109,13 @@ public class WeaverImporter
     
     public MethodReference BlittableTypeConstructor = null!;
 
-    public DefaultAssemblyResolver AssemblyResolver = null!;
+    private readonly DefaultAssemblyResolver _assemblyResolver = new();
+    public DefaultAssemblyResolver AssemblyResolver => _assemblyResolver;
     
-    public static void Shutdown()
+
+    AssemblyDefinition FindAssembly(string assemblyName)
     {
-        _instance = null;
-    }
-    
-    static AssemblyDefinition FindAssembly(string assemblyName)
-    {
-        return Instance.AssemblyResolver.Resolve(new AssemblyNameReference(assemblyName, new Version(0, 0)));
+        return _assemblyResolver.Resolve(new AssemblyNameReference(assemblyName, new Version(0, 0)));
     }
 
     public void ImportCommonTypes(AssemblyDefinition userAssembly)
@@ -107,15 +130,15 @@ public class WeaverImporter
         ByteTypeRef = typeSystem.Byte;
         
         IntPtrType = typeSystem.IntPtr.Resolve();
-        IntPtrAdd = IntPtrType.FindMethod("Add")!;
-        IntPtrZero = IntPtrType.FindField("Zero");
-        IntPtrEqualsOperator = IntPtrType.FindMethod("op_Equality")!;
+        IntPtrAdd = IntPtrType.FindMethod(this, "Add")!;
+        IntPtrZero = IntPtrType.FindField(this, "Zero");
+        IntPtrEqualsOperator = IntPtrType.FindMethod(this,"op_Equality")!;
 
-        UnrealSharpObjectType = UnrealSharpCoreAssembly.FindType(UnrealSharpObject, UnrealSharpCoreNamespace)!;
-        IInterfaceType = UnrealSharpAssembly.FindType("IInterface", CoreUObjectNamespace)!.Resolve();
+        UnrealSharpObjectType = FindType(UnrealSharpCoreAssembly, UnrealSharpObject, UnrealSharpCoreNamespace)!;
+        IInterfaceType = FindType(UnrealSharpAssembly, "IInterface", CoreUObjectNamespace)!.Resolve();
         
         TypeDefinition unrealSharpObjectType = UnrealSharpObjectType.Resolve();
-        NativeObjectGetter = unrealSharpObjectType.FindMethod("get_NativeObject")!;
+        NativeObjectGetter = unrealSharpObjectType.FindMethod(this,"get_NativeObject")!;
 
         GetNativeFunctionFromInstanceAndNameMethod = FindExporterMethod(TypeDefinitionUtilities.UClassCallbacks, "CallGetNativeFunctionFromInstanceAndName");
         
@@ -140,24 +163,24 @@ public class WeaverImporter
         
         InitializeStructMethod = FindExporterMethod(UStructCallbacks, "CallInitializeStruct");
         
-        UObjectDefinition = UnrealSharpAssembly.FindType("UObject", CoreUObjectNamespace)!.Resolve();
-        UActorComponentDefinition = UnrealSharpAssembly.FindType("UActorComponent", EngineNamespace)!.Resolve();
+        UObjectDefinition = FindType(UnrealSharpAssembly, "UObject", CoreUObjectNamespace)!.Resolve();
+        UActorComponentDefinition = FindType(UnrealSharpAssembly, "UActorComponent", EngineNamespace)!.Resolve();
         
-        TypeReference blittableType = UnrealSharpCoreAssembly.FindType(TypeDefinitionUtilities.BlittableTypeAttribute, UnrealSharpCoreAttributesNamespace)!;
-        BlittableTypeConstructor = blittableType.FindMethod(".ctor")!;
+        TypeReference blittableType = FindType(UnrealSharpCoreAssembly, TypeDefinitionUtilities.BlittableTypeAttribute, UnrealSharpCoreAttributesNamespace)!;
+        BlittableTypeConstructor = blittableType.FindMethod(this, ".ctor")!;
 
-        TypeReference generatedType = UnrealSharpCoreAssembly.FindType(GeneratedTypeAttribute, UnrealSharpCoreAttributesNamespace)!;
-        GeneratedTypeCtor = generatedType.FindMethod(".ctor")!;
+        TypeReference generatedType = FindType(UnrealSharpCoreAssembly, GeneratedTypeAttribute, UnrealSharpCoreAttributesNamespace)!;
+        GeneratedTypeCtor = generatedType.FindMethod(this,".ctor")!;
         
-        ScriptInterfaceMarshaller = UnrealSharpAssembly.FindType("ScriptInterfaceMarshaller`1", CoreUObjectNamespace)!.Resolve();
+        ScriptInterfaceMarshaller = FindType(UnrealSharpAssembly, "ScriptInterfaceMarshaller`1", CoreUObjectNamespace)!.Resolve();
         
-        ManagedObjectHandle = UnrealSharpAssembly.FindType("FSharedGCHandle", "UnrealSharp.UnrealSharpCore")!.Resolve();
-        UnmanagedDataStore = UnrealSharpAssembly.FindType("FUnmanagedDataStore", "UnrealSharp.UnrealSharpCore")!.Resolve();
+        ManagedObjectHandle = FindType(UnrealSharpAssembly, "FSharedGCHandle", "UnrealSharp.UnrealSharpCore")!.Resolve();
+        UnmanagedDataStore = FindType(UnrealSharpAssembly, "FUnmanagedDataStore", "UnrealSharp.UnrealSharpCore")!.Resolve();
     }
 
-    private static MethodReference FindBindingsStaticMethod(string findNamespace, string findClass, string findMethod)
+    private MethodReference FindBindingsStaticMethod(string findNamespace, string findClass, string findMethod)
     {
-        foreach (var module in Instance.UnrealSharpAssembly.Modules)
+        foreach (var module in UnrealSharpAssembly.Modules)
         {
             foreach (var type in module.GetAllTypes())
             {
@@ -170,7 +193,7 @@ public class WeaverImporter
                 {
                     if (method.IsStatic && method.Name == findMethod)
                     {
-                        return Instance.UserAssembly.MainModule.ImportReference(method);
+                        return UserAssembly.MainModule.ImportReference(method);
                     }
                 }
             }
@@ -179,7 +202,7 @@ public class WeaverImporter
         throw new Exception("Could not find method " + findMethod + " in class " + findClass + " in namespace " + findNamespace);
     }
 
-    private static MethodReference FindExporterMethod(string exporterName, string functionName)
+    private MethodReference FindExporterMethod(string exporterName, string functionName)
     {
         return FindBindingsStaticMethod(InteropNameSpace, exporterName, functionName);
     }

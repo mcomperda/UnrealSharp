@@ -4,11 +4,11 @@ using UnrealSharpWeaver.Utilities;
 
 namespace UnrealSharpWeaver.NativeTypes;
 
-internal class NativeDataOptionalType(TypeReference propertyTypeRef, TypeReference innerTypeReference, int arrayDim)
-    : NativeDataContainerType(propertyTypeRef, arrayDim, PropertyType.Optional, innerTypeReference)
+internal class NativeDataOptionalType(WeaverImporter importer, TypeReference propertyTypeRef, TypeReference innerTypeReference, int arrayDim)
+    : NativeDataContainerType(importer, propertyTypeRef, arrayDim, PropertyType.Optional, innerTypeReference)
     {
         
-        protected override AssemblyDefinition MarshallerAssembly => WeaverImporter.Instance.UnrealSharpCoreAssembly;
+        protected override AssemblyDefinition MarshallerAssembly => _importer.UnrealSharpCoreAssembly;
         protected override string MarshallerNamespace => WeaverImporter.UnrealSharpCoreMarshallers;
         
     public override string GetContainerMarshallerName()

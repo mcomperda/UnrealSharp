@@ -13,9 +13,9 @@ public partial class StructMetaData : TypeReferenceMetadata
     // Non-serialized for JSON
     public readonly bool IsBlittableStruct;
     // End non-serialized
-    
-    public StructMetaData(TypeDefinition structDefinition) : base(structDefinition, TypeDefinitionUtilities.UStructAttribute)
-    {
+
+    public StructMetaData(WeaverImporter importer, TypeDefinition structDefinition) : base(importer, structDefinition, TypeDefinitionUtilities.UStructAttribute)
+    {        
         Fields = new List<PropertyMetaData>();
         IsBlittableStruct = true;
         
@@ -34,7 +34,7 @@ public partial class StructMetaData : TypeReferenceMetadata
                 IsBlittableStruct = false;
             }
             
-            PropertyMetaData property = new PropertyMetaData(field);
+            PropertyMetaData property = new PropertyMetaData(_importer, field);
             
             // If we match against a backing property field use the property name instead.
             var backingFieldMatch = backingFieldRegex.Match(field.Name);
@@ -81,7 +81,7 @@ public partial class StructMetaData : TypeReferenceMetadata
             return;
         }
         
-        CustomAttribute structFlagsAttribute = new CustomAttribute(WeaverImporter.Instance.BlittableTypeConstructor);
+        CustomAttribute structFlagsAttribute = new CustomAttribute(_importer.BlittableTypeConstructor);
         structDefinition.CustomAttributes.Add(structFlagsAttribute);
         
         TryAddMetaData("BlueprintType", true);

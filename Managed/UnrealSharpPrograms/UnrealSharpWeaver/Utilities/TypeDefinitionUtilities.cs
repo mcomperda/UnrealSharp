@@ -119,16 +119,7 @@ public static class TypeDefinitionUtilities
         return type.CustomAttributes.FindAttributeByType(WeaverImporter.UnrealSharpAttributesNamespace, UInterfaceAttribute);
     }
     
-    public static void AddGeneratedTypeAttribute(this TypeDefinition type)
-    {
-        CustomAttribute attribute = new CustomAttribute(WeaverImporter.Instance.GeneratedTypeCtor);
-        string typeName = type.Name.Substring(1);
-        string fullTypeName = type.Namespace + "." + typeName;
-        attribute.ConstructorArguments.Add(new CustomAttributeArgument(WeaverImporter.Instance.UserAssembly.MainModule.TypeSystem.String, typeName));
-        attribute.ConstructorArguments.Add(new CustomAttributeArgument(WeaverImporter.Instance.UserAssembly.MainModule.TypeSystem.String, fullTypeName));
-        
-        type.CustomAttributes.Add(attribute);
-    }
+  
     
     public static PropertyDefinition? FindPropertyByName(this TypeDefinition classOuter, string propertyName)
     {
@@ -159,24 +150,10 @@ public static class TypeDefinitionUtilities
         return false;
     }
     
-    public static TypeReference FindNestedType(this TypeDefinition typeDef, string typeName)
-    {
-        foreach (var nestedType in typeDef.NestedTypes)
-        {
-            if (nestedType.Name != typeName)
-            {
-                continue;
-            }
-
-            return WeaverImporter.Instance.UserAssembly.MainModule.ImportReference(nestedType);
-        }
-        
-        throw new Exception($"{typeName} not found in {typeDef}.");
-    }
     
-    public static MethodDefinition AddMethod(this TypeDefinition type, string name, TypeReference? returnType, MethodAttributes attributes = MethodAttributes.Private, params TypeReference[] parameterTypes)
+    public static MethodDefinition AddMethod(this TypeDefinition type, WeaverImporter importer, string name, TypeReference? returnType, MethodAttributes attributes = MethodAttributes.Private, params TypeReference[] parameterTypes)
     {
-        returnType ??= WeaverImporter.Instance.UserAssembly.MainModule.TypeSystem.Void;
+        returnType ??= importer.UserAssembly.MainModule.TypeSystem.Void;
         
         var method = new MethodDefinition(name, attributes, returnType);
         
@@ -190,25 +167,25 @@ public static class TypeDefinitionUtilities
 
     private static readonly MethodAttributes MethodAttributes = MethodAttributes.Public | MethodAttributes.Static;
     
-    public static MethodDefinition AddToNativeMethod(this TypeDefinition type, TypeDefinition valueType, TypeReference[]? parameters = null)
+    public static MethodDefinition AddToNativeMethod(this TypeDefinition type, TypeDefinition valueType, WeaverImporter importer, TypeReference[]? parameters = null)
     {
         if (parameters == null)
         {
-            parameters = [WeaverImporter.Instance.IntPtrType, WeaverImporter.Instance.Int32TypeRef, valueType];
+            parameters = [importer.IntPtrType, importer.Int32TypeRef, valueType];
         }
         
-        MethodDefinition toNativeMethod = type.AddMethod("ToNative", WeaverImporter.Instance.VoidTypeRef, MethodAttributes, parameters);
+        MethodDefinition toNativeMethod = type.AddMethod(importer, "ToNative", importer.VoidTypeRef, MethodAttributes, parameters);
         return toNativeMethod;
     }
     
-    public static MethodDefinition AddFromNativeMethod(this TypeDefinition type, TypeDefinition returnType, TypeReference[]? parameters = null)
+    public static MethodDefinition AddFromNativeMethod(this TypeDefinition type, TypeDefinition returnType, WeaverImporter importer, TypeReference[]? parameters = null)
     {
         if (parameters == null)
         {
-            parameters = [WeaverImporter.Instance.IntPtrType, WeaverImporter.Instance.Int32TypeRef];
+            parameters = [importer.IntPtrType, importer.Int32TypeRef];
         }
         
-        MethodDefinition fromNative = type.AddMethod("FromNative", returnType, MethodAttributes, parameters);
+        MethodDefinition fromNative = type.AddMethod(importer, "FromNative", returnType, MethodAttributes, parameters);
         return fromNative;
     }
     
@@ -224,7 +201,7 @@ public static class TypeDefinitionUtilities
         return field;
     }
     
-    public static FieldReference FindField(this TypeDefinition typeDef, string fieldName)
+    public static FieldReference FindField(this TypeDefinition typeDef, WeaverImporter importer, string fieldName)
     {
         foreach (var field in typeDef.Fields)
         {
@@ -233,59 +210,31 @@ public static class TypeDefinitionUtilities
                 continue;
             }
 
-            return WeaverImporter.Instance.UserAssembly.MainModule.ImportReference(field);
+            return importer.UserAssembly.MainModule.ImportReference(field);
         }
         
         throw new Exception($"{fieldName} not found in {typeDef}.");
     }
     
-    public static bool IsUObject(this TypeDefinition typeDefinition)
-    {
-        if (!typeDefinition.IsUClass())
-        {
-            return false;
-        }
-        
-        while (typeDefinition != null)
-        {
-            if (typeDefinition.BaseType == null)
-            {
-                return false;
-            }
-            
-            if (typeDefinition == WeaverImporter.Instance.UObjectDefinition)
-            {
-                return true;
-            }
-
-            typeDefinition = typeDefinition.BaseType.Resolve();
-        }
-        
-        return false;
-    }
+   
     
-    public static TypeReference ImportType(this TypeReference type)
+  
+    public static bool HasMethod(this TypeDefinition typeDef, WeaverImporter importer, string methodName, bool throwIfNotFound = true, params TypeReference[] parameterTypes)
     {
-        return WeaverImporter.Instance.UserAssembly.MainModule.ImportReference(type);
-    }
-    
-    public static bool HasMethod(this TypeDefinition typeDef, string methodName, bool throwIfNotFound = true, params TypeReference[] parameterTypes)
-    {
-        return FindMethod(typeDef, methodName, throwIfNotFound, parameterTypes) != null;
+        return FindMethod(typeDef, importer, methodName, throwIfNotFound, parameterTypes) != null;
     }
 
-    public static MethodReference? FindMethod(this TypeReference typeReference, string methodName,
-        bool throwIfNotFound = true, params TypeReference[] parameterTypes)
+    public static MethodReference? FindMethod(this TypeReference typeReference, WeaverImporter importer, string methodName, bool throwIfNotFound = true, params TypeReference[] parameterTypes)
     {
-        return FindMethod(typeReference.Resolve(), methodName, throwIfNotFound, parameterTypes);
+        return FindMethod(typeReference.Resolve(), importer, methodName, throwIfNotFound, parameterTypes);
     }
 
-    public static MethodReference? FindMethod(this TypeDefinition typeDef, string methodName, bool throwIfNotFound = true, params TypeReference[] parameterTypes)
+    public static MethodReference? FindMethod(this TypeDefinition typeDef, WeaverImporter importer, string methodName, bool throwIfNotFound = true, params TypeReference[] parameterTypes)
     {
         TypeDefinition? currentClass = typeDef;
         while (currentClass != null)
         {
-            MethodReference? method = FindOwnMethod(currentClass, methodName, throwIfNotFound: false, parameterTypes);
+            MethodReference? method = FindOwnMethod(importer, currentClass, methodName, throwIfNotFound: false, parameterTypes);
             if (method != null)
             {
                 return method;
@@ -302,7 +251,7 @@ public static class TypeDefinitionUtilities
         return default;
     }
     
-    public static MethodReference? FindOwnMethod(TypeDefinition typeDef, string methodName, bool throwIfNotFound = true, params TypeReference[] parameterTypes)
+    public static MethodReference? FindOwnMethod(WeaverImporter importer, TypeDefinition typeDef, string methodName, bool throwIfNotFound = true, params TypeReference[] parameterTypes)
     {
         foreach (var classMethod in typeDef.Methods)
         {
@@ -328,7 +277,7 @@ public static class TypeDefinitionUtilities
 
             if (found)
             {
-                return classMethod.ImportMethod();
+                return classMethod.ImportMethod(importer);
             }
         }
 
@@ -340,212 +289,7 @@ public static class TypeDefinitionUtilities
         return default;
     }
     
-    public static NativeDataType GetDataType(this TypeReference typeRef, string propertyName, Collection<CustomAttribute>? customAttributes)
-    {
-        int arrayDim = 1;
-        TypeDefinition typeDef = typeRef.Resolve();
-        SequencePoint? sequencePoint = ErrorEmitter.GetSequencePointFromMemberDefinition(typeDef);
-
-        if (customAttributes != null)
-        {
-            CustomAttribute? propertyAttribute = typeDef.GetUProperty();
-            
-            if (propertyAttribute != null)
-            {
-                CustomAttributeArgument? arrayDimArg = propertyAttribute.FindAttributeField("ArrayDim");
-
-                if (typeRef is GenericInstanceType genericType && genericType.GetElementType().FullName == "UnrealSharp.FixedSizeArrayReadWrite`1")
-                {
-                    if (arrayDimArg.HasValue)
-                    {
-                        arrayDim = (int) arrayDimArg.Value.Value;
-
-                        // Unreal doesn't have a separate type for fixed arrays, so we just want to generate the inner UProperty type with an arrayDim.
-                        typeRef = genericType.GenericArguments[0];
-                        typeDef = typeRef.Resolve();
-                    }
-                    else
-                    {
-                        throw new InvalidPropertyException(propertyName, sequencePoint, "Fixed array properties must specify an ArrayDim in their [UProperty] attribute");
-                    }
-                }
-                else if (arrayDimArg.HasValue)
-                {
-                    throw new InvalidPropertyException(propertyName, sequencePoint, "ArrayDim is only valid for FixedSizeArray properties.");
-                }
-            }
-        }
-
-        switch (typeDef.FullName)
-        {
-            case "System.Double":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.Double);
-            case "System.Single":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.Float);
-
-            case "System.SByte":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.Int8);
-            case "System.Int16":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.Int16);
-            case "System.Int32":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.Int);
-            case "System.Int64":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.Int64);
-
-            case "System.Byte":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.Byte);
-            case "System.UInt16":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.UInt16);
-            case "System.UInt32":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.UInt32);
-            case "System.UInt64":
-                return new NativeDataBuiltinType(typeRef, arrayDim, PropertyType.UInt64);
-
-            case "System.Boolean":
-                return new NativeDataBooleanType(typeRef, arrayDim);
-
-            case "System.String":
-                return new NativeDataStringType(typeRef, arrayDim);
-
-            default:
-
-                if (typeRef.IsGenericInstance || typeRef.IsByReference)
-                {
-                    GenericInstanceType? instanceType = null;
-                    if (typeRef is GenericInstanceType genericInstanceType)
-                    {
-                        instanceType = genericInstanceType;
-                    }
-                    if (typeRef is ByReferenceType byReferenceType)
-                    {
-                        instanceType = byReferenceType.ElementType as GenericInstanceType;
-                        typeRef = byReferenceType.ElementType;
-                    }
-
-                    if (instanceType != null)
-                    {
-                        TypeReference[] genericArguments = instanceType.GenericArguments.ToArray();
-                        string? genericTypeName = instanceType.ElementType.Name;
-                        
-                        if (genericTypeName.Contains("TArray`1") || genericTypeName.Contains("List`1"))
-                        {
-                            return new NativeDataArrayType(typeRef, arrayDim, genericArguments[0]);
-                        }
-
-                        if (genericTypeName.Contains("TNativeArray`1") || genericTypeName.Contains("ReadOnlySpan`1"))
-                        {
-                            return new NativeDataNativeArrayType(typeRef, arrayDim, genericArguments[0]);
-                        }
-
-                        if (genericTypeName.Contains("TMap`2") || genericTypeName.Contains("Dictionary`2"))
-                        {
-                            return new NativeDataMapType(typeRef, arrayDim, genericArguments[0], genericArguments[1]);
-                        }
-                        
-                        if (genericTypeName.Contains("TSet`1") || genericTypeName.Contains("HashSet`1"))
-                        {
-                            return new NativeDataSetType(typeRef, arrayDim, genericArguments[0]);
-                        }
-
-                        if (genericTypeName.Contains("TSubclassOf`1"))
-                        {
-                            return new NativeDataClassType(typeRef, genericArguments[0], arrayDim);
-                        }
-
-                        if (genericTypeName.Contains("TWeakObjectPtr`1"))
-                        {
-                            return new NativeDataWeakObjectType(typeRef, genericArguments[0], arrayDim);
-                        }
-
-                        if (genericTypeName.Contains("TSoftObjectPtr`1"))
-                        {
-                            return new NativeDataSoftObjectType(typeRef, genericArguments[0], arrayDim);
-                        }
-
-                        if (genericTypeName.Contains("TSoftClassPtr`1"))
-                        {
-                            return new NativeDataSoftClassType(typeRef, genericArguments[0], arrayDim);
-                        }
-
-                        if (genericTypeName.Contains("Option`1"))
-                        {
-                            return new NativeDataOptionalType(typeRef, genericArguments[0], arrayDim);
-                        }
-                    }
-                }
-
-                if (typeDef.IsEnum && typeDef.IsUEnum())
-                {
-                    CustomAttribute? enumAttribute = typeDef.GetUEnum();
-                
-                    if (enumAttribute == null)
-                    {
-                        throw new InvalidPropertyException(propertyName, sequencePoint, "Enum properties must use an UEnum enum: " + typeRef.FullName);
-                    }
-                
-                    // TODO: This is just true for properties, not for function parameters they can be int. Need a good way to differentiate.
-                    // if (typeDef.GetEnumUnderlyingType().Resolve() != ByteTypeRef.Resolve())
-                    // {
-                    //     throw new InvalidPropertyException(propertyName, sequencePoint, "Enum's exposed to Blueprints must have an underlying type of System.Byte: " + typeRef.FullName);
-                    // }
-
-                    return new NativeDataEnumType(typeDef, arrayDim);
-                }
-
-                if (typeDef.IsInterface && typeDef.IsUInterface())
-                {
-                    return new NativeDataInterfaceType(typeRef, typeDef.Name + "Marshaller");
-                }
-                
-                if (typeDef.FullName == "UnrealSharp.FText")
-                {
-                    return new NativeDataTextType(typeDef);
-                }
-                
-                if (typeDef.FullName == "UnrealSharp.FName")
-                {
-                    return new NativeDataNameType(typeDef, arrayDim);
-                }
-            
-                if (typeDef.Name == "TMulticastDelegate`1")
-                {
-                    return new NativeDataMulticastDelegate(typeRef);
-                }
-            
-                if (typeDef.Name == "TDelegate`1")
-                {
-                    return new NativeDataDelegateType(typeRef);
-                }
-            
-                if (customAttributes != null && NativeDataDefaultComponent.IsDefaultComponent(customAttributes))
-                {
-                    return new NativeDataDefaultComponent(customAttributes, typeDef, arrayDim);
-                }
-            
-                TypeDefinition? superType = typeDef;
-                while (superType != null && superType.FullName != "UnrealSharp.Core.UnrealSharpObject")
-                {
-                    TypeReference superTypeRef = superType.BaseType;
-                    superType = superTypeRef != null ? superTypeRef.Resolve() : null;
-                }
-
-                if (superType != null)
-                {
-                    return new NativeDataObjectType(typeRef, typeDef, arrayDim);
-                }
-
-                // See if this is a struct
-                CustomAttribute? structAttribute = typeDef.GetUStruct();
-                
-                if (structAttribute == null)
-                {
-                    return typeDef.IsUnmanagedType() ? new NativeDataUnmanagedType(typeDef, arrayDim) : new NativeDataManagedObjectType(typeRef, arrayDim);
-                }
-                
-                return typeDef.GetBlittableType() != null ? new NativeDataBlittableStructType(typeDef, arrayDim) : new NativeDataStructType(typeDef, typeDef.GetMarshallerClassName(), arrayDim);
-        }
-    }
-    
+   
     public static string GetMarshallerClassName(this TypeReference typeRef)
     {
         return typeRef.Name + "Marshaller";

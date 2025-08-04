@@ -6,9 +6,9 @@ namespace UnrealSharpWeaver.NativeTypes;
 
 public class NativeDataInterfaceType : NativeDataSimpleType
 {
-    public NativeDataInterfaceType(TypeReference typeRef, string marshallerName) : base(typeRef, marshallerName, 0, PropertyType.ScriptInterface)
+    public NativeDataInterfaceType(WeaverImporter importer, TypeReference typeRef, string marshallerName) : base(importer, typeRef, marshallerName, 0, PropertyType.ScriptInterface)
     {
-        InnerType = new TypeReferenceMetadata(typeRef.Resolve());
+        InnerType = new TypeReferenceMetadata(importer, typeRef.Resolve());
     }
 
     public override void PrepareForRewrite(TypeDefinition typeDefinition, PropertyMetaData propertyMetadata, object outer)

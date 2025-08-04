@@ -19,16 +19,19 @@ public class FunctionMetaData : BaseMetaData
     public bool IsBlueprintEvent => FunctionFlags.HasAnyFlags(EFunctionFlags.BlueprintNativeEvent);
     public bool HasParameters => Parameters.Length > 0 || HasReturnValue;
     public bool HasReturnValue => ReturnValue != null;
-    public bool IsRpc => FunctionFlags.HasAnyFlags(Utilities.MethodUtilities.RpcFlags);
+    public bool IsRpc => FunctionFlags.HasAnyFlags(WeaverImporter.RpcFlags);
     public bool HasOutParams => FunctionFlags.HasAnyFlags(EFunctionFlags.HasOutParms);
     private bool _shouldBeRemoved;
     // End non-serialized
 
     private const string CallInEditorName = "CallInEditor";
 
-    public FunctionMetaData(MethodDefinition method, bool onlyCollectMetaData = false, EFunctionFlags functionFlags = EFunctionFlags.None) 
-        : base(method, Utilities.MethodUtilities.UFunctionAttribute)
-    {
+    private readonly FunctionProcessor _functionProcessor;
+
+    public FunctionMetaData(WeaverImporter importer, MethodDefinition method, bool onlyCollectMetaData = false, EFunctionFlags functionFlags = EFunctionFlags.None) 
+        : base(importer, method, WeaverImporter.UFunctionAttribute)
+    {        
+        _functionProcessor = new FunctionProcessor(importer);
         MethodDef = method;
         FunctionFlags = functionFlags;
         
@@ -39,7 +42,7 @@ public class FunctionMetaData : BaseMetaData
             hasOutParams = true;
             try
             {
-                ReturnValue = PropertyMetaData.FromTypeReference(method.ReturnType, "ReturnValue", ParameterType.ReturnValue);
+                ReturnValue = PropertyMetaData.FromTypeReference(_importer, method.ReturnType, "ReturnValue", ParameterType.ReturnValue);
             }
             catch (InvalidPropertyException)
             {
@@ -74,7 +77,7 @@ public class FunctionMetaData : BaseMetaData
                 modifier = ParameterType.Ref;
             }
 
-            Parameters[i] = PropertyMetaData.FromTypeReference(paramType, param.Name, modifier);
+            Parameters[i] = PropertyMetaData.FromTypeReference(_importer, paramType, param.Name, modifier);
 
             if (param.HasConstant)
             {
@@ -108,7 +111,7 @@ public class FunctionMetaData : BaseMetaData
         if (baseType == MethodDef.DeclaringType)
         {
             RewriteInfo = new FunctionRewriteInfo(this);
-            FunctionProcessor.PrepareFunctionForRewrite(this, MethodDef.DeclaringType);
+            _functionProcessor.PrepareFunctionForRewrite(this, MethodDef.DeclaringType);
         }
         else
         {
@@ -118,8 +121,8 @@ public class FunctionMetaData : BaseMetaData
             {
                 return;
             }
-            
-            FunctionProcessor.MakeImplementationMethod(this);
+
+            _functionProcessor.MakeImplementationMethod(this);
             
             // We don't need the override anymore. It's copied into the Implementation method.
             // But we can't remove it here because it would mess up for child classes during weaving.
@@ -239,7 +242,7 @@ public class FunctionMetaData : BaseMetaData
     {
         processor.Append(loadTypeField);
         processor.Emit(OpCodes.Ldstr, Name);
-        processor.Emit(OpCodes.Call, WeaverImporter.Instance.GetNativeFunctionFromClassAndNameMethod);
+        processor.Emit(OpCodes.Call, _importer.GetNativeFunctionFromClassAndNameMethod);
         processor.Append(setFunctionPointer);
     }
     
@@ -257,7 +260,7 @@ public class FunctionMetaData : BaseMetaData
                 
             processor.Append(loadFunctionPointer);
             processor.Emit(OpCodes.Ldstr, param.Name);
-            processor.Emit(OpCodes.Call, WeaverImporter.Instance.GetPropertyOffsetFromNameMethod);
+            processor.Emit(OpCodes.Call, _importer.GetPropertyOffsetFromNameMethod);
             processor.Emit(OpCodes.Stsfld, offsetField);
         }
     }
@@ -270,7 +273,7 @@ public class FunctionMetaData : BaseMetaData
         }
 
         processor.Append(loadFunctionPointer);
-        processor.Emit(OpCodes.Call, WeaverImporter.Instance.GetNativeFunctionParamsSizeMethod);
+        processor.Emit(OpCodes.Call, _importer.GetNativeFunctionParamsSizeMethod);
         processor.Emit(OpCodes.Stsfld, RewriteInfo.FunctionParamSizeField);
     }
     
@@ -286,7 +289,7 @@ public class FunctionMetaData : BaseMetaData
 
             processor.Append(loadFunctionPointer);
             processor.Emit(OpCodes.Ldstr, paramRewriteInfo.PropertyMetaData.Name);
-            processor.Emit(OpCodes.Call, WeaverImporter.Instance.GetNativePropertyFromNameMethod);
+            processor.Emit(OpCodes.Call, _importer.GetNativePropertyFromNameMethod);
             processor.Emit(OpCodes.Stsfld, nativePropertyField);
         }
     }

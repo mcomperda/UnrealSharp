@@ -6,21 +6,21 @@ using UnrealSharpWeaver.Utilities;
 
 namespace UnrealSharpWeaver.TypeProcessors;
 
-public static class ConstructorBuilder
+public class ConstructorBuilder(WeaverImporter importer) : BaseProcessor(importer)
 {
-    public static MethodDefinition MakeStaticConstructor(TypeDefinition type)
+    public MethodDefinition MakeStaticConstructor(TypeDefinition type)
     {
         return CreateStaticConstructor(type, MethodAttributes.Static);
     }
 
-    public static MethodDefinition CreateStaticConstructor(TypeDefinition type, MethodAttributes attributes, params TypeReference[] parameterTypes)
+    public MethodDefinition CreateStaticConstructor(TypeDefinition type, MethodAttributes attributes, params TypeReference[] parameterTypes)
     {
         MethodDefinition staticConstructor = type.GetStaticConstructor();
 
         if (staticConstructor == null)
         {
-            staticConstructor = type.AddMethod(".cctor", 
-                WeaverImporter.Instance.VoidTypeRef,
+            staticConstructor = type.AddMethod(_importer, ".cctor",
+                _importer.VoidTypeRef,
                 attributes | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName | MethodAttributes.HideBySig,
                 parameterTypes);
         }
@@ -33,14 +33,14 @@ public static class ConstructorBuilder
         return staticConstructor;
     }
     
-    public static MethodDefinition CreateConstructor(TypeDefinition typeDefinition, MethodAttributes attributes, params TypeReference[] parameterTypes)
+    public MethodDefinition CreateConstructor(TypeDefinition typeDefinition, MethodAttributes attributes, params TypeReference[] parameterTypes)
     {
         MethodDefinition? constructor = typeDefinition.GetConstructors().FirstOrDefault(ctor => ctor.Parameters.Count == parameterTypes.Length);
         
         if (constructor == null)
         {
-            constructor = typeDefinition.AddMethod(".ctor", 
-                WeaverImporter.Instance.VoidTypeRef,
+            constructor = typeDefinition.AddMethod(_importer, ".ctor",
+                _importer.VoidTypeRef,
                 attributes | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
                 parameterTypes);
         }
@@ -48,7 +48,7 @@ public static class ConstructorBuilder
         return constructor;
     }
     
-    public static void CreateTypeInitializer(TypeDefinition typeDefinition, Instruction field, Instruction[] initializeInstructions, string engineName = "", bool finalizeMethod = false)
+    public void CreateTypeInitializer(TypeDefinition typeDefinition, Instruction field, Instruction[] initializeInstructions, string engineName = "", bool finalizeMethod = false)
     {
         MethodDefinition staticConstructorMethod = MakeStaticConstructor(typeDefinition);
         ILProcessor processor = staticConstructorMethod.Body.GetILProcessor();
@@ -83,7 +83,7 @@ public static class ConstructorBuilder
         }
     }
 
-    public static void InitializeFields(MethodDefinition staticConstructor, List<PropertyMetaData> fields, Instruction loadNativeClassField)
+    public void InitializeFields(MethodDefinition staticConstructor, List<PropertyMetaData> fields, Instruction loadNativeClassField)
     {
         ILProcessor processor = staticConstructor.Body.GetILProcessor();
         foreach (var property in fields)
@@ -97,7 +97,7 @@ public static class ConstructorBuilder
             Instruction setNativeProperty;
             if (property.NativePropertyField == null)
             {
-                VariableDefinition nativePropertyVar = processor.Body.Method.AddLocalVariable(WeaverImporter.Instance.IntPtrType);
+                VariableDefinition nativePropertyVar = processor.Body.Method.AddLocalVariable(_importer.IntPtrType);
                 loadNativeProperty = Instruction.Create(OpCodes.Ldloc, nativePropertyVar);
                 setNativeProperty = Instruction.Create(OpCodes.Stloc, nativePropertyVar);
             }

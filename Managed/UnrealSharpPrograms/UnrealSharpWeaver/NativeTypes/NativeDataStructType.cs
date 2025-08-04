@@ -4,10 +4,10 @@ using UnrealSharpWeaver.Utilities;
 
 namespace UnrealSharpWeaver.NativeTypes;
 
-class NativeDataStructType(TypeReference structType, string marshallerName, int arrayDim, PropertyType propertyType = PropertyType.Struct) 
-    : NativeDataSimpleType(structType, marshallerName, arrayDim, propertyType)
+class NativeDataStructType(WeaverImporter importer, TypeReference structType, string marshallerName, int arrayDim, PropertyType propertyType = PropertyType.Struct) 
+    : NativeDataSimpleType(importer, structType, marshallerName, arrayDim, propertyType)
 {
-    public TypeReferenceMetadata InnerType { get; set; } = new(structType.Resolve());
+    public TypeReferenceMetadata InnerType { get; set; } = new(importer,structType.Resolve());
 
     public override void PrepareForRewrite(TypeDefinition typeDefinition,
         PropertyMetaData propertyMetadata, object outer)

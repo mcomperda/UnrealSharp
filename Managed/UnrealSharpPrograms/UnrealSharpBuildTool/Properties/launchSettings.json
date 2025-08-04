@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "Package": {
+      "commandName": "Project",
+      "commandLineArgs": "--Action PackageProject\r\n--EngineDirectory \"P:/UnrealEngine/UE_5.6/Engine/\"\r\n--ProjectDirectory \"P:/UnrealProjects/Beacon/\"\r\n--ProjectName Beacon \r\n--PluginDirectory \"P:/UnrealProjects/Beacon/Plugins/UnrealSharp\"\r\n--DotNetPath \"C:\\Program Files\\dotnet\\dotnet.exe\"\r\n--AdditionalArgs ArchiveDirectory=\"P:/UnrealProjects/Packaged/Beacon/Windows\" BuildConfig=Release "
+    },
+    "Build": {
+      "commandName": "Project",
+      "commandLineArgs": "--Action Build\r\n--EngineDirectory \"P:/UnrealEngine/UE_5.6/Engine/\"\r\n--ProjectDirectory \"P:/UnrealProjects/Beacon/\"\r\n--ProjectName Beacon \r\n--PluginDirectory \"P:/UnrealProjects/Beacon/Plugins/UnrealSharp\"\r\n--DotNetPath \"C:\\Program Files\\dotnet\\dotnet.exe\"\r\n"
+    },
+    "Rebuild": {
+      "commandName": "Project",
+      "commandLineArgs": "--Action Rebuild\r\n--EngineDirectory \"P:/UnrealEngine/UE_5.6/Engine/\"\r\n--ProjectDirectory \"P:/UnrealProjects/Beacon/\"\r\n--ProjectName Beacon \r\n--PluginDirectory \"P:/UnrealProjects/Beacon/Plugins/UnrealSharp\"\r\n--DotNetPath \"C:\\Program Files\\dotnet\\dotnet.exe\"\r\n"
+    },
+    "BuildWeave": {
+      "commandName": "Project",
+      "commandLineArgs": "--Action BuildWeave\r\n--EngineDirectory \"P:/UnrealEngine/UE_5.6/Engine/\"\r\n--ProjectDirectory \"P:/UnrealProjects/Beacon/\"\r\n--ProjectName Beacon \r\n--PluginDirectory \"P:/UnrealProjects/Beacon/Plugins/UnrealSharp\"\r\n--DotNetPath \"C:\\Program Files\\dotnet\\dotnet.exe\"\r\n"
+    }
+  }
+}

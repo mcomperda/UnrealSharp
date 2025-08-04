@@ -23,14 +23,15 @@ public class NativeDataContainerType : NativeDataType
 
     private MethodReference? _copyDestructInstance;
     
-    protected virtual AssemblyDefinition MarshallerAssembly => WeaverImporter.Instance.UnrealSharpAssembly;
+    protected virtual AssemblyDefinition MarshallerAssembly => _importer.UnrealSharpAssembly;
     protected virtual string MarshallerNamespace => WeaverImporter.UnrealSharpNamespace;
     
     protected TypeReference[] ContainerMarshallerTypeParameters { get; set; } = [];
     
-    public NativeDataContainerType(TypeReference typeRef, int containerDim, PropertyType propertyType, TypeReference value) : base(typeRef, containerDim, propertyType)
+    public NativeDataContainerType(WeaverImporter importer, TypeReference typeRef, int containerDim, PropertyType propertyType, TypeReference value)
+        : base(importer, typeRef, containerDim, propertyType)
     {
-        InnerProperty = PropertyMetaData.FromTypeReference(value, "Inner");
+        InnerProperty = PropertyMetaData.FromTypeReference(_importer, value, "Inner");
         NeedsNativePropertyField = true;
     }
 
@@ -45,8 +46,8 @@ public class NativeDataContainerType : NativeDataType
     }
     
     public virtual void InitializeMarshallerParameters()
-    {
-        ContainerMarshallerTypeParameters = [InnerProperty.PropertyDataType.CSharpType.ImportType()];
+    {        
+        ContainerMarshallerTypeParameters = [_importer.ImportType(InnerProperty.PropertyDataType.CSharpType)];
     }
     
     public virtual string GetContainerWrapperType()
@@ -70,8 +71,8 @@ public class NativeDataContainerType : NativeDataType
         InnerProperty.PropertyDataType.PrepareForRewrite(typeDefinition, propertyMetadata, "");
 
         // Ensure that IList<T> itself is imported.
-        CSharpType.ImportType();
-
+        _importer.ImportType(CSharpType);
+        
         InitializeMarshallerParameters();
 
         // Instantiate generics for the direct access and copying marshallers.
@@ -81,19 +82,19 @@ public class NativeDataContainerType : NativeDataType
         if (outer is MethodDefinition method)
         {
             prefix = method.Name + "_" + prefix;
-            TypeReference genericCopyMarshallerTypeRef = MarshallerAssembly.FindType(GetCopyContainerMarshallerName(), MarshallerNamespace)!;
+            TypeReference genericCopyMarshallerTypeRef = _importer.FindType(MarshallerAssembly, GetCopyContainerMarshallerName(), MarshallerNamespace)!;
             
-            _containerMarshallerType = genericCopyMarshallerTypeRef.Resolve().MakeGenericInstanceType(ContainerMarshallerTypeParameters).ImportType();
+            _containerMarshallerType = _importer.ImportType(genericCopyMarshallerTypeRef.Resolve().MakeGenericInstanceType(ContainerMarshallerTypeParameters));
             
-            _copyDestructInstance = _containerMarshallerType.Resolve().FindMethod("DestructInstance")!;
-            _copyDestructInstance = FunctionProcessor.MakeMethodDeclaringTypeGeneric(_copyDestructInstance, ContainerMarshallerTypeParameters);
+            _copyDestructInstance = _containerMarshallerType.Resolve().FindMethod(_importer, "DestructInstance")!;
+            _copyDestructInstance = _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(_copyDestructInstance, ContainerMarshallerTypeParameters);
             
             fieldAttributes |= FieldAttributes.Static;
         }
         else
         {
-            TypeReference genericCopyMarshallerTypeRef = MarshallerAssembly.FindType(GetContainerMarshallerName(), MarshallerNamespace)!;
-            _containerMarshallerType = genericCopyMarshallerTypeRef.Resolve().MakeGenericInstanceType(ContainerMarshallerTypeParameters).ImportType();
+            TypeReference genericCopyMarshallerTypeRef = _importer.FindType(MarshallerAssembly, GetContainerMarshallerName(), MarshallerNamespace)!;
+            _containerMarshallerType = _importer.ImportType(genericCopyMarshallerTypeRef.Resolve().MakeGenericInstanceType(ContainerMarshallerTypeParameters));
 
             if (propertyMetadata.MemberRef is PropertyDefinition propertyDefinition)
             {
@@ -105,14 +106,14 @@ public class NativeDataContainerType : NativeDataType
         TypeDefinition arrTypeDef = _containerMarshallerType.Resolve();
         
         _containerMashallerCtor = arrTypeDef.GetConstructors().Single();
-        _containerMashallerCtor = _containerMashallerCtor.ImportMethod();
-        _containerMashallerCtor = FunctionProcessor.MakeMethodDeclaringTypeGeneric(_containerMashallerCtor, ContainerMarshallerTypeParameters);
+        _containerMashallerCtor = _importer.ImportMethod(_containerMashallerCtor);
+        _containerMashallerCtor = _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(_containerMashallerCtor, ContainerMarshallerTypeParameters);
         
-        _fromNative = arrTypeDef.FindMethod("FromNative")!;
-        _fromNative = FunctionProcessor.MakeMethodDeclaringTypeGeneric(_fromNative, ContainerMarshallerTypeParameters);
+        _fromNative = arrTypeDef.FindMethod(_importer, "FromNative")!;
+        _fromNative = _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(_fromNative, ContainerMarshallerTypeParameters);
 
-        _toNative = arrTypeDef.FindMethod("ToNative")!;
-        _toNative = FunctionProcessor.MakeMethodDeclaringTypeGeneric(_toNative, ContainerMarshallerTypeParameters);
+        _toNative = arrTypeDef.FindMethod(_importer, "ToNative")!;
+        _toNative = _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(_toNative, ContainerMarshallerTypeParameters);
         
         _containerMarshallerField = typeDefinition.AddField(prefix + "Marshaller", _containerMarshallerType, fieldAttributes);
         _nativePropertyField = propertyMetadata.NativePropertyField!;
@@ -138,7 +139,7 @@ public class NativeDataContainerType : NativeDataType
         }
 
         MethodDefinition? constructor = _containerMarshallerType.Resolve().GetConstructors().Single();
-        processor.Emit(OpCodes.Newobj, FunctionProcessor.MakeMethodDeclaringTypeGeneric(WeaverImporter.Instance.UserAssembly.MainModule.ImportReference(constructor), ContainerMarshallerTypeParameters));
+        processor.Emit(OpCodes.Newobj, _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(_importer.UserAssembly.MainModule.ImportReference(constructor), ContainerMarshallerTypeParameters));
         processor.Emit(OpCodes.Stfld, _containerMarshallerField);
 
         // Store the branch destination
@@ -170,7 +171,7 @@ public class NativeDataContainerType : NativeDataType
     public override void WriteLoad(ILProcessor processor, TypeDefinition type, Instruction loadBufferInstruction,
         FieldDefinition offsetField, VariableDefinition localVar)
     {
-        WriteMarshalFromNative(processor, type, GetArgumentBufferInstructions(loadBufferInstruction, offsetField), processor.Create(OpCodes.Ldc_I4_0));
+        WriteMarshalFromNative(processor, type, GetArgumentBufferInstructions(_importer, loadBufferInstruction, offsetField), processor.Create(OpCodes.Ldc_I4_0));
         processor.Emit(OpCodes.Stloc, localVar);
     }
     
@@ -178,7 +179,7 @@ public class NativeDataContainerType : NativeDataType
         FieldDefinition offsetField, FieldDefinition destField)
     {
         processor.Emit(OpCodes.Ldarg_0);
-        WriteMarshalFromNative(processor, type, GetArgumentBufferInstructions(loadBufferInstruction, offsetField), processor.Create(OpCodes.Ldc_I4_0));
+        WriteMarshalFromNative(processor, type, GetArgumentBufferInstructions(_importer, loadBufferInstruction, offsetField), processor.Create(OpCodes.Ldc_I4_0));
         processor.Emit(OpCodes.Stfld, destField);
     }
 
@@ -187,14 +188,14 @@ public class NativeDataContainerType : NativeDataType
         ParameterDefinition paramDefinition)
     {
         Instruction[] loadSource = [processor.Create(OpCodes.Ldarg, argIndex)];
-        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(loadBufferInstruction, offsetField);
+        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(_importer, loadBufferInstruction, offsetField);
         return WriteMarshalToNativeWithCleanup(processor, type, loadBufferInstructions, processor.Create(OpCodes.Ldc_I4_0), loadSource);
     }
     
     public override IList<Instruction>? WriteStore(ILProcessor processor, TypeDefinition type,
         Instruction loadBufferInstruction, FieldDefinition offsetField, FieldDefinition srcField)
     {
-        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(loadBufferInstruction, offsetField);
+        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(_importer, loadBufferInstruction, offsetField);
         Instruction[] loadSource = [processor.Create(OpCodes.Ldarg_0), processor.Create(OpCodes.Ldfld, srcField)];
         return WriteMarshalToNativeWithCleanup(processor, type, loadBufferInstructions, processor.Create(OpCodes.Ldc_I4_0), loadSource);
     }

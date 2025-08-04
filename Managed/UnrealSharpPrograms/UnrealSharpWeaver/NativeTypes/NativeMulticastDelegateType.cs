@@ -8,8 +8,8 @@ namespace UnrealSharpWeaver.NativeTypes;
 
 class NativeDataMulticastDelegate : NativeDataBaseDelegateType
 {
-    public NativeDataMulticastDelegate(TypeReference delegateType) 
-        : base(delegateType, "MulticastDelegateMarshaller`1", PropertyType.MulticastInlineDelegate)
+    public NativeDataMulticastDelegate(WeaverImporter importer, TypeReference delegateType) 
+        : base(importer, delegateType, "MulticastDelegateMarshaller`1", PropertyType.MulticastInlineDelegate)
     {
         NeedsNativePropertyField = true;
     }
@@ -32,7 +32,7 @@ class NativeDataMulticastDelegate : NativeDataBaseDelegateType
         TypeReference foundType = GetWrapperType(delegateType);
         processor.Append(loadNativePointer);
         
-        MethodReference initializeDelegateMethod = UnrealDelegateProcessor.FindOrCreateInitializeDelegate(foundType.Resolve());
+        MethodReference initializeDelegateMethod = _importer.UnrealDelegateProcessor.FindOrCreateInitializeDelegate(foundType.Resolve());
         processor.Emit(OpCodes.Call, initializeDelegateMethod);
     }
 

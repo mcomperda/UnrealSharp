@@ -6,8 +6,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-        <Nullable>enable</Nullable>
-        <OutputPath>../../../Binaries/Managed</OutputPath>
+        <Nullable>enable</Nullable>        
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
 	    <NoWarn>$(NoWarn);1570;0649;0169;0108;0109;CS1587;CS1591</NoWarn>
     </PropertyGroup>
@@ -31,5 +30,9 @@
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
     </ItemGroup>
+
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="copy &quot;$(TargetDir)*.*&quot; &quot;$(ProjectDir)..\..\..\Binaries\Managed\&quot; /y" />
+	</Target>
     
 </Project>

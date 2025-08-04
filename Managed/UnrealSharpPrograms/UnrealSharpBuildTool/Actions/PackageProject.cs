@@ -2,20 +2,15 @@
 
 namespace UnrealSharpBuildTool.Actions;
 
-public class PackageProject : BuildToolAction
+public class PackageProject(BuildToolContext ctx) : BuildToolAction(ctx)
 {
-    public override bool RunAction()
+    protected override bool DoRunAction()
     {
-        string archiveDirectoryPath = Program.TryGetArgument("ArchiveDirectory");
+        var archiveDirectory = _context.Paths.GetArchiveDirectory();        
         
-        if (string.IsNullOrEmpty(archiveDirectoryPath))
-        {
-            throw new Exception("ArchiveDirectory argument is required for the Publish action.");
-        }
-
-        string rootProjectPath = Path.Combine(archiveDirectoryPath, Program.BuildToolOptions.ProjectName);
-        string binariesPath = Program.GetOutputPath(rootProjectPath);
-        string bindingsPath = Path.Combine(Program.BuildToolOptions.PluginDirectory, "Managed", "UnrealSharp");
+        // Where to publish the binaries to
+        var publishPath = _context.Paths.GetManagedBinariesPublishDirectory();
+        
         
         Collection<string> extraArguments =
         [
@@ -23,16 +18,29 @@ public class PackageProject : BuildToolAction
             "--runtime",
             "win-x64",
 			"-p:DefineAdditionalConstants=PACKAGE",
-            $"-p:PublishDir=\"{binariesPath}\""
+            $"-p:PublishDir=\"{publishPath}\""
         ];
 
-        BuildSolution buildBindings = new BuildSolution(bindingsPath, extraArguments, BuildConfig.Publish);
-        buildBindings.RunAction();
+        var buildBindings = new BuildSolution(_context, _context.Paths.BindingsSolutionDirectory, extraArguments, BuildConfig.Publish);
+        if(!buildBindings.RunAction())
+        {
+            _context.Logger.Warning($"Failed to build and publish bindings solution at: {buildBindings.Folder}");
+            return false;
+        }
         
-        BuildUserSolution buildUserSolution = new BuildUserSolution(null, BuildConfig.Publish);
-        buildUserSolution.RunAction();
-        
-        WeaveProject weaveProject = new WeaveProject(binariesPath);
+        var buildUserSolution = new BuildUserSolution(_context, null, BuildConfig.Publish);        
+        if (!buildUserSolution.RunAction())
+        {
+            _context.Logger.Warning($"Failed to build and publish user solution at: {buildUserSolution.Folder}");
+            return false;
+        }
+
+        var weaveProject = new WeaveProject(_context);
+        if(!weaveProject.RunAction())
+        {
+            _context.Logger.Warning($"Failed to weave project!");
+            return false;
+        }
         weaveProject.RunAction();
         
         return true;

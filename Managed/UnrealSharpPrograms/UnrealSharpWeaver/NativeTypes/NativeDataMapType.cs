@@ -9,9 +9,10 @@ public class NativeDataMapType : NativeDataContainerType
 {
     public PropertyMetaData ValueProperty { get; set; }
     
-    public NativeDataMapType(TypeReference typeRef, int arrayDim, TypeReference key, TypeReference value) : base(typeRef, arrayDim, PropertyType.Map, key)
+    public NativeDataMapType(WeaverImporter importer, TypeReference typeRef, int arrayDim, TypeReference key, TypeReference value)
+        : base(importer, typeRef, arrayDim, PropertyType.Map, key)
     {
-        ValueProperty = PropertyMetaData.FromTypeReference(value, "Value");
+        ValueProperty = PropertyMetaData.FromTypeReference(_importer, value, "Value");
         IsNetworkSupported = false;
     }
 
@@ -42,8 +43,8 @@ public class NativeDataMapType : NativeDataContainerType
     {
         ContainerMarshallerTypeParameters =
         [
-            InnerProperty.PropertyDataType.CSharpType.ImportType(),
-            ValueProperty.PropertyDataType.CSharpType.ImportType()
+            _importer.ImportType(InnerProperty.PropertyDataType.CSharpType),
+            _importer.ImportType(ValueProperty.PropertyDataType.CSharpType)
         ];
     }
 

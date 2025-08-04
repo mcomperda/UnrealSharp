@@ -67,9 +67,8 @@ public static class PluginLoader
         catch (Exception ex)
         {
             LogUnrealSharpPlugins.LogError($"An error occurred while loading the plugin: {ex.Message}");
-        }
-
-        return null;
+            throw;
+        }        
     }
 
     public static bool UnloadPlugin(string assemblyPath)

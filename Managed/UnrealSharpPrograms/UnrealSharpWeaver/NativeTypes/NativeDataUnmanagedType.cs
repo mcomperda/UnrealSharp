@@ -3,7 +3,7 @@ using UnrealSharpWeaver.MetaData;
 
 namespace UnrealSharpWeaver.NativeTypes;
 
-public class NativeDataUnmanagedType(TypeReference unmanagedType, int arrayDim) : NativeDataSimpleType(unmanagedType, "UnmanagedTypeMarshaller`1", arrayDim, PropertyType.Struct)
+public class NativeDataUnmanagedType(WeaverImporter importer, TypeReference unmanagedType, int arrayDim) : NativeDataSimpleType(importer, unmanagedType, "UnmanagedTypeMarshaller`1", arrayDim, PropertyType.Struct)
 {
-    public TypeReferenceMetadata InnerType { get; set; } =  new(WeaverImporter.Instance.UnmanagedDataStore.Resolve());
+    public TypeReferenceMetadata InnerType { get; set; } =  new(importer,importer.UnmanagedDataStore.Resolve());
 }

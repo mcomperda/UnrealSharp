@@ -6,8 +6,8 @@ using UnrealSharpWeaver.TypeProcessors;
 
 namespace UnrealSharpWeaver.NativeTypes;
 
-class NativeDataNativeArrayType(TypeReference typeRef, int containerDim, TypeReference innerType)
-    : NativeDataContainerType(typeRef, containerDim, PropertyType.Array, innerType)
+class NativeDataNativeArrayType(WeaverImporter importer, TypeReference typeRef, int containerDim, TypeReference innerType)
+    : NativeDataContainerType(importer, typeRef, containerDim, PropertyType.Array, innerType)
 {
     public override string GetContainerMarshallerName()
     {

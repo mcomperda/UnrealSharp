@@ -7,7 +7,7 @@ public class DelegateMetaData : TypeReferenceMetadata
 {
     public FunctionMetaData Signature { get; set; }
     
-    public DelegateMetaData(FunctionMetaData signature, TypeReference member, string attributeName = "", EFunctionFlags functionFlags = EFunctionFlags.None) : base(member, attributeName)
+    public DelegateMetaData(WeaverImporter importer, FunctionMetaData signature, TypeReference member, string attributeName = "", EFunctionFlags functionFlags = EFunctionFlags.None) : base(importer, member, attributeName)
     {
         Name = DelegateUtilities.GetUnrealDelegateName(member);
         

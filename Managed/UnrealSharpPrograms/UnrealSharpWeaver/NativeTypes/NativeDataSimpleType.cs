@@ -7,8 +7,8 @@ using OpCodes = Mono.Cecil.Cil.OpCodes;
 
 namespace UnrealSharpWeaver.NativeTypes;
 
-public abstract class NativeDataSimpleType(TypeReference typeRef, string marshallerName, int arrayDim, PropertyType propertyType) 
-    : NativeDataType(typeRef, arrayDim, propertyType)
+public abstract class NativeDataSimpleType(WeaverImporter importer, TypeReference typeRef, string marshallerName, int arrayDim, PropertyType propertyType) 
+    : NativeDataType(importer, typeRef, arrayDim, propertyType)
 {
     protected TypeReference? MarshallerClass;
     protected MethodReference? ToNative;
@@ -21,7 +21,7 @@ public abstract class NativeDataSimpleType(TypeReference typeRef, string marshal
 
     protected virtual TypeReference[] GetTypeParams()
     {
-        return [CSharpType.ImportType()];
+        return [_importer.ImportType(CSharpType)];
     }
 
     public override void PrepareForRewrite(TypeDefinition typeDefinition, PropertyMetaData propertyMetadata,
@@ -32,11 +32,11 @@ public abstract class NativeDataSimpleType(TypeReference typeRef, string marshal
         var isGenericMarshaller = marshallerName.Contains('`');
 
         TypeReference[] typeParams = GetTypeParams();
-        
-        AssemblyUtilities.ForEachAssembly(definition =>
+
+        _importer.ForEachAssembly(definition =>
         {
             TypeReference? foundMarshaller = isGenericMarshaller
-                ? definition.FindGenericType("", marshallerName, typeParams, false) 
+                ? _importer.FindGenericType(definition, "", marshallerName, typeParams, false) 
                 : GetTypeInAssembly(definition);
             
             if (foundMarshaller is not null)
@@ -55,17 +55,17 @@ public abstract class NativeDataSimpleType(TypeReference typeRef, string marshal
         }
         
         var marshallerTypeDefinition = GetMarshallerTypeDefinition();
-        ToNative = marshallerTypeDefinition.FindMethod("ToNative")!;
-        FromNative = marshallerTypeDefinition.FindMethod("FromNative")!;
+        ToNative = marshallerTypeDefinition.FindMethod(_importer, "ToNative")!;
+        FromNative = marshallerTypeDefinition.FindMethod(_importer, "FromNative")!;
         
         if (isGenericMarshaller)
         {
-            ToNative = FunctionProcessor.MakeMethodDeclaringTypeGeneric(ToNative, typeParams);
-            FromNative = FunctionProcessor.MakeMethodDeclaringTypeGeneric(FromNative, typeParams);
+            ToNative = _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(ToNative, typeParams);
+            FromNative = _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(FromNative, typeParams);
         }
         
-        ToNative = ToNative.ImportMethod();
-        FromNative = FromNative.ImportMethod();
+        ToNative = _importer.ImportMethod(ToNative);
+        FromNative = _importer.ImportMethod(FromNative);
     }
 
     public override void WriteGetter(TypeDefinition type, MethodDefinition getter, Instruction[] loadBufferPtr, FieldDefinition? fieldDefinition)
@@ -85,7 +85,7 @@ public abstract class NativeDataSimpleType(TypeReference typeRef, string marshal
 
     public override void WriteLoad(ILProcessor processor, TypeDefinition type, Instruction loadBuffer, FieldDefinition offsetField, VariableDefinition localVar)
     {
-        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(loadBuffer, offsetField);
+        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(_importer, loadBuffer, offsetField);
         WriteMarshalFromNative(processor, type, loadBufferInstructions, processor.Create(OpCodes.Ldc_I4_0));
         processor.Emit(OpCodes.Stloc, localVar);
     }
@@ -93,7 +93,7 @@ public abstract class NativeDataSimpleType(TypeReference typeRef, string marshal
     public override void WriteLoad(ILProcessor processor, TypeDefinition type, Instruction loadBuffer, FieldDefinition offsetField, FieldDefinition destField)
     {
         processor.Emit(OpCodes.Ldarg_0);
-        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(loadBuffer, offsetField);
+        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(_importer, loadBuffer, offsetField);
         WriteMarshalFromNative(processor, type, loadBufferInstructions, processor.Create(OpCodes.Ldc_I4_0));
         processor.Emit(OpCodes.Stfld, destField);
     }
@@ -109,7 +109,7 @@ public abstract class NativeDataSimpleType(TypeReference typeRef, string marshal
             source.Add(loadInstructionOutParam);
         }
         
-        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(loadBuffer, offsetField);
+        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(_importer, loadBuffer, offsetField);
         
         return WriteMarshalToNativeWithCleanup(processor, type, loadBufferInstructions, processor.Create(OpCodes.Ldc_I4_0), source.ToArray());
     }
@@ -122,7 +122,7 @@ public abstract class NativeDataSimpleType(TypeReference typeRef, string marshal
             processor.Create(_isReference ? OpCodes.Ldflda : OpCodes.Ldfld, srcField)
         ];
         
-        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(loadBuffer, offsetField);
+        Instruction[] loadBufferInstructions = GetArgumentBufferInstructions(_importer, loadBuffer, offsetField);
         return WriteMarshalToNativeWithCleanup(processor, type, loadBufferInstructions, processor.Create(OpCodes.Ldc_I4_0), loadField);
     }
     
@@ -168,7 +168,8 @@ public abstract class NativeDataSimpleType(TypeReference typeRef, string marshal
             else
             {
                 GenericInstanceType generic = (GenericInstanceType)CSharpType;
-                typeParams = [WeaverImporter.Instance.UserAssembly.MainModule.ImportReference(generic.GenericArguments[0].Resolve())];
+
+                typeParams = [_importer.UserAssembly.MainModule.ImportReference(generic.GenericArguments[0].Resolve())];
             }
         }
 
@@ -179,14 +180,14 @@ public abstract class NativeDataSimpleType(TypeReference typeRef, string marshal
     {
         // Try to find the marshaller in the bindings again, but with the namespace of the property type.
         TypeDefinition? propType = CSharpType.Resolve();
-        TypeReference? type = assemblyDefinition.FindType(marshallerName, propType.Namespace, false);
+        TypeReference? type = _importer.FindType(assemblyDefinition, marshallerName, propType.Namespace, false);
         if (type is not null)
         {
             return type;
         }
         
         // Try to find the marshaller in the bindings assembly. These are unique so we don't need to check the namespace.
-        TypeReference? typeInBindingAssembly = assemblyDefinition.FindType(marshallerName, "", false);
+        TypeReference? typeInBindingAssembly = _importer.FindType(assemblyDefinition, marshallerName, "", false);
         if (typeInBindingAssembly is not null)
         {
             return typeInBindingAssembly;

@@ -4,8 +4,8 @@ namespace UnrealSharpWeaver.NativeTypes;
 
 public class NativeDataSetType : NativeDataContainerType
 {
-    public NativeDataSetType(TypeReference typeRef, int containerDim, TypeReference value) 
-        : base(typeRef, containerDim, PropertyType.Set, value)
+    public NativeDataSetType(WeaverImporter importer, TypeReference typeRef, int containerDim, TypeReference value) 
+        : base(importer, typeRef, containerDim, PropertyType.Set, value)
     {
     }
     

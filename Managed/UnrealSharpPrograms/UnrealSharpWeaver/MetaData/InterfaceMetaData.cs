@@ -11,7 +11,7 @@ public class InterfaceMetaData : TypeReferenceMetadata
     const string CannotImplementInterfaceInBlueprint = "CannotImplementInterfaceInBlueprint";
     // End non-serialized
     
-    public InterfaceMetaData(TypeDefinition typeDefinition) : base(typeDefinition, TypeDefinitionUtilities.UInterfaceAttribute)
+    public InterfaceMetaData(WeaverImporter importer, TypeDefinition typeDefinition) : base(importer,typeDefinition, TypeDefinitionUtilities.UInterfaceAttribute)
     {
         Functions = [];
         
@@ -19,7 +19,7 @@ public class InterfaceMetaData : TypeReferenceMetadata
         {
             if (method.IsAbstract && method.IsUFunction())
             {
-                Functions.Add(new FunctionMetaData(method, onlyCollectMetaData: true));
+                Functions.Add(new FunctionMetaData(importer, method, onlyCollectMetaData: true));
             }
         }
         

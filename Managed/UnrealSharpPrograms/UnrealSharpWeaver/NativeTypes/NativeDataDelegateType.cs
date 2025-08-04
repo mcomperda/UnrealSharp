@@ -8,7 +8,7 @@ namespace UnrealSharpWeaver.NativeTypes;
 
 public class NativeDataDelegateType : NativeDataBaseDelegateType
 {
-    public NativeDataDelegateType(TypeReference type) : base(type, "SingleDelegateMarshaller`1", PropertyType.Delegate)
+    public NativeDataDelegateType(WeaverImporter importer, TypeReference type) : base(importer, type, "SingleDelegateMarshaller`1", PropertyType.Delegate)
     {
 
     }
@@ -22,10 +22,10 @@ public class NativeDataDelegateType : NativeDataBaseDelegateType
         
         if (propertyMetadata.MemberRef is not PropertyDefinition)
         {
-            VariableDefinition propertyPointer = processor.Body.Method.AddLocalVariable(WeaverImporter.Instance.IntPtrType);
+            VariableDefinition propertyPointer = processor.Body.Method.AddLocalVariable(_importer.IntPtrType);
             processor.Append(loadNativePointer);
             processor.Emit(OpCodes.Ldstr, propertyMetadata.Name);
-            processor.Emit(OpCodes.Call, WeaverImporter.Instance.GetNativePropertyFromNameMethod);
+            processor.Emit(OpCodes.Call, _importer.GetNativePropertyFromNameMethod);
             processor.Emit(OpCodes.Stloc, propertyPointer);
             processor.Emit(OpCodes.Ldloc, propertyPointer);
         }
@@ -34,7 +34,7 @@ public class NativeDataDelegateType : NativeDataBaseDelegateType
             processor.Append(loadNativePointer);
         }
         
-        MethodReference initialize = UnrealDelegateProcessor.FindOrCreateInitializeDelegate(wrapperType.Resolve());
+        MethodReference initialize = _importer.UnrealDelegateProcessor.FindOrCreateInitializeDelegate(wrapperType.Resolve());
         processor.Emit(OpCodes.Call, initialize);
     }
 }

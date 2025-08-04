@@ -3,7 +3,6 @@ using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
 using UnrealSharpWeaver.MetaData;
-using UnrealSharpWeaver.TypeProcessors;
 using UnrealSharpWeaver.Utilities;
 using OpCodes = Mono.Cecil.Cil.OpCodes;
 
@@ -50,16 +49,20 @@ public abstract class NativeDataType
     
     private TypeReference? ToNativeDelegateType;
     private TypeReference? FromNativeDelegateType;
+
+    protected readonly WeaverImporter _importer;
+
     // End non-json properties
-    
-    public NativeDataType(TypeReference typeRef, int arrayDim, PropertyType propertyType = PropertyType.Unknown)
+
+    public NativeDataType(WeaverImporter importer, TypeReference typeRef, int arrayDim, PropertyType propertyType = PropertyType.Unknown)
     {
         if (typeRef.IsByReference)
         {
             typeRef = typeRef.GetElementType();
         }
-        
-        CSharpType = typeRef.ImportType();
+                
+        _importer = importer;
+        CSharpType = importer.ImportType(typeRef);
         ArrayDim = arrayDim;
         PropertyType = propertyType;
     }
@@ -83,7 +86,7 @@ public abstract class NativeDataType
         BackingField = type.AddField($"{propertyMetaData.Name}_BackingField", CSharpType, FieldAttributes.Private);
     }
     
-    public static Instruction[] GetArgumentBufferInstructions(Instruction? loadBufferInstruction, FieldDefinition offsetField)
+    public static Instruction[] GetArgumentBufferInstructions(WeaverImporter importer, Instruction? loadBufferInstruction, FieldDefinition offsetField)
     {
         List<Instruction> instructionBuffer = [];
         
@@ -94,11 +97,11 @@ public abstract class NativeDataType
         else
         {
             instructionBuffer.Add(Instruction.Create(OpCodes.Ldarg_0));
-            instructionBuffer.Add(Instruction.Create(OpCodes.Call, WeaverImporter.Instance.NativeObjectGetter));
+            instructionBuffer.Add(Instruction.Create(OpCodes.Call, importer.NativeObjectGetter));
         }
 
         instructionBuffer.Add(Instruction.Create(OpCodes.Ldsfld, offsetField));  
-        instructionBuffer.Add(Instruction.Create(OpCodes.Call, WeaverImporter.Instance.IntPtrAdd));
+        instructionBuffer.Add(Instruction.Create(OpCodes.Call, importer.IntPtrAdd));
 
         return instructionBuffer.ToArray();
     }
@@ -158,7 +161,7 @@ public abstract class NativeDataType
     public virtual void PrepareForRewrite(TypeDefinition typeDefinition, PropertyMetaData propertyMetadata,
         object outer)
     {
-        TypeReference? marshallingDelegates = WeaverImporter.Instance.UnrealSharpCoreAssembly.FindGenericType(WeaverImporter.UnrealSharpCoreMarshallers, "MarshallingDelegates`1", [CSharpType]);
+        TypeReference? marshallingDelegates = _importer.FindGenericType(_importer.UnrealSharpCoreAssembly, WeaverImporter.UnrealSharpCoreMarshallers, "MarshallingDelegates`1", [CSharpType]);
         
         if (marshallingDelegates == null)
         {
@@ -167,18 +170,19 @@ public abstract class NativeDataType
         
         TypeDefinition marshallingDelegatesDef = marshallingDelegates.Resolve();
         
-        ToNativeDelegateType = marshallingDelegatesDef.FindNestedType("ToNative");
-        FromNativeDelegateType = marshallingDelegatesDef.FindNestedType("FromNative");
+
+        ToNativeDelegateType = _importer.FindNestedType(marshallingDelegatesDef, "ToNative");
+        FromNativeDelegateType = _importer.FindNestedType(marshallingDelegatesDef, "FromNative");
     }
 
     protected void EmitDelegate(ILProcessor processor, TypeReference delegateType, MethodReference method)
     {
         processor.Emit(OpCodes.Ldnull);
-        method = WeaverImporter.Instance.UserAssembly.MainModule.ImportReference(method);
+        method = _importer.UserAssembly.MainModule.ImportReference(method);
         processor.Emit(OpCodes.Ldftn, method);
         MethodReference ctor = (from constructor in delegateType.Resolve().GetConstructors() where constructor.Parameters.Count == 2 select constructor).First().Resolve();
-        ctor = FunctionProcessor.MakeMethodDeclaringTypeGeneric(ctor, CSharpType);
-        ctor = WeaverImporter.Instance.UserAssembly.MainModule.ImportReference(ctor);
+        ctor = _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(ctor, CSharpType);
+        ctor = _importer.UserAssembly.MainModule.ImportReference(ctor);
         processor.Emit(OpCodes.Newobj, ctor);
     }
 
@@ -188,15 +192,15 @@ public abstract class NativeDataType
     {
         TypeReference? marshallerType = null;
         AssemblyDefinition? marshallerAssembly = null;
-        AssemblyUtilities.ForEachAssembly(action: assembly =>
+        _importer.ForEachAssembly(action: assembly =>
         {
             if (typeParams is { Length: > 0 })
             {
-                marshallerType = assembly.FindGenericType(string.Empty, marshallerTypeName, typeParams, false);
+                marshallerType = _importer.FindGenericType(assembly, string.Empty, marshallerTypeName, typeParams, false);
             }
             else
             {
-                marshallerType = assembly.FindType(marshallerTypeName, string.Empty, false);
+                marshallerType = _importer.FindType(assembly, marshallerTypeName, string.Empty, false);
             }
             
             if (marshallerType != null)
@@ -213,13 +217,13 @@ public abstract class NativeDataType
         }
 
         TypeDefinition marshallerTypeDef = GetMarshallerTypeDefinition(marshallerAssembly, marshallerType);
-        MethodReference fromNative = marshallerTypeDef.FindMethod("FromNative")!;
-        MethodReference toNative = marshallerTypeDef.FindMethod("ToNative")!;
+        MethodReference fromNative = marshallerTypeDef.FindMethod(_importer, "FromNative")!;
+        MethodReference toNative = marshallerTypeDef.FindMethod(_importer, "ToNative")!;
 
         if (typeParams != null)
         {
-            fromNative = FunctionProcessor.MakeMethodDeclaringTypeGeneric(fromNative, typeParams);
-            toNative = FunctionProcessor.MakeMethodDeclaringTypeGeneric(toNative, typeParams);
+            fromNative = _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(fromNative, typeParams);
+            toNative = _importer.FunctionProcessor.MakeMethodDeclaringTypeGeneric(toNative, typeParams);
         }
         
         if (ToNativeDelegateType == null || FromNativeDelegateType == null)

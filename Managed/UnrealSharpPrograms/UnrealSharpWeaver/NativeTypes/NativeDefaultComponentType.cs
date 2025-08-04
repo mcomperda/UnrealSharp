@@ -13,17 +13,17 @@ class NativeDataDefaultComponent : NativeDataSimpleType
     public string AttachmentSocket { get; set; } = string.Empty;
     public TypeReferenceMetadata InnerType { get; set; }
     
-    public NativeDataDefaultComponent(Collection<CustomAttribute> customAttributes, TypeReference typeRef, int arrayDim) 
-        : base(typeRef, "DefaultComponentMarshaller`1", arrayDim, PropertyType.DefaultComponent)
+    public NativeDataDefaultComponent(WeaverImporter importer, Collection<CustomAttribute> customAttributes, TypeReference typeRef, int arrayDim) 
+        : base(importer,typeRef, "DefaultComponentMarshaller`1", arrayDim, PropertyType.DefaultComponent)
     {
         TypeDefinition? defaultComponentType = typeRef.Resolve();
         
-        if (!defaultComponentType.IsUObject())
+        if (!_importer.IsUObject(defaultComponentType))
         {
             throw new Exception($"{defaultComponentType.FullName} needs to be a UClass if exposed through UProperty!");
         }
         
-        InnerType = new TypeReferenceMetadata(defaultComponentType);
+        InnerType = new TypeReferenceMetadata(importer, defaultComponentType);
         
         CustomAttribute upropertyAttribute = PropertyUtilities.GetUProperty(customAttributes)!;
         

@@ -71,8 +71,7 @@ bool FCSProcHelper::InvokeUnrealSharpBuildTool(const FString& BuildAction, const
 	FString PluginFolder = FPaths::ConvertRelativePathToFull(IPluginManager::Get().FindPlugin(UE_PLUGIN_NAME)->GetBaseDir());
 	FString DotNetPath = GetDotNetExecutablePath();
 
-	FString Args;
-	Args += FString::Printf(TEXT("\"%s\""), *GetUnrealSharpBuildToolPath());
+	FString Args;	
 	Args += FString::Printf(TEXT(" --Action %s"), *BuildAction);
 	Args += FString::Printf(TEXT(" --EngineDirectory \"%s\""), *FPaths::ConvertRelativePathToFull(FPaths::EngineDir()));
 	Args += FString::Printf(TEXT(" --ProjectDirectory \"%s\""), *FPaths::ConvertRelativePathToFull(FPaths::ProjectDir()));
@@ -92,7 +91,9 @@ bool FCSProcHelper::InvokeUnrealSharpBuildTool(const FString& BuildAction, const
 	int32 ReturnCode = 0;
 	FString Output;
 	FString WorkingDirectory = GetPluginAssembliesPath();
-	return InvokeCommand(DotNetPath, Args, ReturnCode, Output, &WorkingDirectory);
+	auto toolPath = GetUnrealSharpBuildToolPath();
+	UE_LOG(LogUnrealSharpProcHelper, Log, TEXT("Launching build tool at: %s"), *toolPath);
+	return InvokeCommand(*toolPath, Args, ReturnCode, Output, &WorkingDirectory);
 }
 
 FString FCSProcHelper::GetLatestHostFxrPath()
@@ -135,7 +136,7 @@ FString FCSProcHelper::GetLatestHostFxrPath()
 
 FString FCSProcHelper::GetRuntimeHostPath()
 {
-#if WITH_EDITOR
+#if !PACKAGE
 	return GetLatestHostFxrPath();
 #else
 #ifdef _WIN32
@@ -156,7 +157,7 @@ FString FCSProcHelper::GetPathToSolution()
 
 FString FCSProcHelper::GetPluginAssembliesPath()
 {
-#if WITH_EDITOR
+#if !PACKAGE
 	return FPaths::Combine(GetPluginDirectory(), "Binaries", "Managed");
 #else
 	return GetUserAssemblyDirectory();
@@ -175,7 +176,9 @@ FString FCSProcHelper::GetRuntimeConfigPath()
 
 FString FCSProcHelper::GetUserAssemblyDirectory()
 {
-	return FPaths::Combine(FPaths::ProjectDir(), "Binaries", "Managed");
+	FString ProjectDirectory = FPaths::ProjectDir();
+	FString AbsolutePath = FPaths::ConvertRelativePathToFull(ProjectDirectory);
+	return FPaths::Combine(AbsolutePath, "Binaries", "Managed");
 }
 
 FString FCSProcHelper::GetUnrealSharpMetadataPath()
@@ -292,7 +295,7 @@ bool FCSProcHelper::IsProjectReloadable(FStringView ProjectPath)
 
 FString FCSProcHelper::GetUnrealSharpBuildToolPath()
 {
-	return FPaths::ConvertRelativePathToFull(GetPluginAssembliesPath() / "UnrealSharpBuildTool.dll");
+	return FPaths::ConvertRelativePathToFull(GetPluginAssembliesPath() / "UnrealSharpBuildTool.exe");
 }
 
 FString FCSProcHelper::GetDotNetDirectory()
@@ -343,9 +346,8 @@ FString& FCSProcHelper::GetPluginDirectory()
 	{
 		TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(UE_PLUGIN_NAME);
 		check(Plugin);
-		PluginDirectory = Plugin->GetBaseDir();
-	}
-
+		PluginDirectory = FPaths::ConvertRelativePathToFull(Plugin->GetBaseDir());
+	}	
 	return PluginDirectory;
 }
 

@@ -5,9 +5,12 @@ using UnrealSharpWeaver.Utilities;
 
 namespace UnrealSharpWeaver.TypeProcessors;
 
-public static class UnrealClassProcessor
+public class UnrealClassProcessor(WeaverImporter importer) : BaseProcessor(importer)
 { 
-    public static void ProcessClasses(IList<TypeDefinition> classes, ApiMetaData assemblyMetadata)
+    private readonly ConstructorBuilder _constructorBuilder = new(importer);
+    
+
+    public void ProcessClasses(IList<TypeDefinition> classes, ApiMetaData assemblyMetadata)
     {
         assemblyMetadata.ClassMetaData.Capacity = classes.Count;
 
@@ -15,6 +18,7 @@ public static class UnrealClassProcessor
         foreach (var classDef in classes)
         {
             ProcessParentClass(classDef, classes, rewrittenClasses, assemblyMetadata);
+            _importer.Logger.Info($"Processed class '{classDef.FullName}'");
         }
         
         foreach (ClassMetaData classMetaData in assemblyMetadata.ClassMetaData)
@@ -23,11 +27,11 @@ public static class UnrealClassProcessor
         }
     }
     
-    private static void ProcessParentClass(TypeDefinition type, IList<TypeDefinition> classes, HashSet<TypeDefinition> rewrittenClasses, ApiMetaData assemblyMetadata)
+    private void ProcessParentClass(TypeDefinition type, IList<TypeDefinition> classes, HashSet<TypeDefinition> rewrittenClasses, ApiMetaData assemblyMetadata)
     {
         TypeDefinition baseType = type.BaseType.Resolve();
         
-        if (!baseType.IsUObject())
+        if (!_importer.IsUObject(baseType))
         {
             throw new Exception($"{type.FullName} is marked with UClass but doesn't inherit from CoreUObject.Object.");
         }
@@ -42,29 +46,29 @@ public static class UnrealClassProcessor
             return;
         }
         
-        ClassMetaData classMetaData = new ClassMetaData(type);
+        ClassMetaData classMetaData = new ClassMetaData(_importer, type);
         assemblyMetadata.ClassMetaData.Add(classMetaData);
         
         ProcessClass(type, classMetaData);
         rewrittenClasses.Add(type);
     }
     
-    private static void ProcessClass(TypeDefinition classTypeDefinition, ClassMetaData metadata)
+    private void ProcessClass(TypeDefinition classTypeDefinition, ClassMetaData metadata)
     {
         // Rewrite all the properties of the class to make getters/setters that call Native code.
         if (metadata.Properties != null)
         {
             var offsetsToInitialize = new List<Tuple<FieldDefinition, PropertyMetaData>>();
             var pointersToInitialize = new List<Tuple<FieldDefinition, PropertyMetaData>>();
-            PropertyProcessor.ProcessClassMembers(ref offsetsToInitialize, ref pointersToInitialize, classTypeDefinition, metadata.Properties);
+            _importer.PropertyProcessor.ProcessClassMembers(ref offsetsToInitialize, ref pointersToInitialize, classTypeDefinition, metadata.Properties);
         }
         
         // Add a field to cache the native UClass pointer.
         // Example: private static readonly nint NativeClassPtr = UCoreUObjectExporter.CallGetNativeClassFromName("MyActorClass");
-        FieldDefinition nativeClassField = classTypeDefinition.AddField("NativeClass", WeaverImporter.Instance.IntPtrType);
-        
-        ConstructorBuilder.CreateTypeInitializer(classTypeDefinition, Instruction.Create(OpCodes.Stsfld, nativeClassField), 
-            [Instruction.Create(OpCodes.Call, WeaverImporter.Instance.GetNativeClassFromNameMethod)]);
+        FieldDefinition nativeClassField = classTypeDefinition.AddField("NativeClass", importer.IntPtrType);
+
+        _constructorBuilder.CreateTypeInitializer(classTypeDefinition, Instruction.Create(OpCodes.Stsfld, nativeClassField), 
+            [Instruction.Create(OpCodes.Call, importer.GetNativeClassFromNameMethod)]);
 
         foreach (var field in classTypeDefinition.Fields)
         {
@@ -74,13 +78,13 @@ public static class UnrealClassProcessor
             }
         }
         
-        MethodDefinition staticConstructor = ConstructorBuilder.MakeStaticConstructor(classTypeDefinition);
+        MethodDefinition staticConstructor = _constructorBuilder.MakeStaticConstructor(classTypeDefinition);
         ILProcessor processor = staticConstructor.Body.GetILProcessor();
         Instruction loadNativeClassField = Instruction.Create(OpCodes.Ldsfld, nativeClassField);
         
         if (metadata.Properties != null)
         {
-            ConstructorBuilder.InitializeFields(staticConstructor, metadata.Properties, loadNativeClassField);
+            _constructorBuilder.InitializeFields(staticConstructor, metadata.Properties, loadNativeClassField);
         }
         
         foreach (FunctionMetaData function in metadata.Functions)
@@ -101,7 +105,7 @@ public static class UnrealClassProcessor
         staticConstructor.FinalizeMethod();
     }
 
-    static void EmitFunctionGlueToStaticCtor(FunctionMetaData function, ILProcessor processor, Instruction loadNativeClassField, MethodDefinition staticConstructor)
+    private void EmitFunctionGlueToStaticCtor(FunctionMetaData function, ILProcessor processor, Instruction loadNativeClassField, MethodDefinition staticConstructor)
     {
         try
         {
@@ -110,7 +114,7 @@ public static class UnrealClassProcessor
                 return;
             }
             
-            VariableDefinition variableDefinition = staticConstructor.AddLocalVariable(WeaverImporter.Instance.IntPtrType);
+            VariableDefinition variableDefinition = staticConstructor.AddLocalVariable(importer.IntPtrType);
             Instruction loadNativePointer = Instruction.Create(OpCodes.Ldloc, variableDefinition);
             Instruction storeNativePointer = Instruction.Create(OpCodes.Stloc, variableDefinition);
             

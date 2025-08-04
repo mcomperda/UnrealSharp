@@ -23,7 +23,7 @@ struct FCSManagedPluginCallbacks
 	UnloadPluginCallback UnloadPlugin = nullptr;
 };
 
-using FInitializeRuntimeHost = bool (*)(const TCHAR*, const TCHAR*, FCSManagedPluginCallbacks*, const void*, FCSManagedCallbacks::FManagedCallbacks*);
+using FInitializeRuntimeHost = bool (*)(const char*, const char*, FCSManagedPluginCallbacks*, const void*, FCSManagedCallbacks::FManagedCallbacks*);
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnManagedAssemblyLoaded, const FName&);
 DECLARE_MULTICAST_DELEGATE(FOnAssembliesReloaded);
@@ -125,6 +125,7 @@ private:
 	friend FCSAssembly;
 	friend FUnrealSharpCoreModule;
 
+	bool InitializePlugin();
 	void Initialize();
 	static void Shutdown() { Instance = nullptr; }
 
@@ -133,6 +134,7 @@ private:
 	bool LoadRuntimeHost();
 	bool InitializeDotNetRuntime();
 	bool LoadAllUserAssemblies();
+	static void LogWin32Error();
 
 	// UObjectArray listener interface
 	virtual void NotifyUObjectDeleted(const UObjectBase* Object, int32 Index) override;

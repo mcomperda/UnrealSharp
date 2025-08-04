@@ -1,61 +1,58 @@
-﻿namespace UnrealSharpBuildTool.Actions;
+﻿using UnrealSharpWeaver;
 
-public class WeaveProject : BuildToolAction
+namespace UnrealSharpBuildTool.Actions;
+
+public class WeaveProject(BuildToolContext ctx) : BuildToolAction(ctx)
 {
-    readonly string _outputDirectory;
-    
-    public WeaveProject(string outputDirectory = "")
+    protected override bool DoRunAction()
     {
-        _outputDirectory = string.IsNullOrEmpty(outputDirectory) ? Program.GetOutputPath() : outputDirectory;
-    }
-    
-    public override bool RunAction()
-    {
-        string weaverPath = Program.GetWeaver();
-        
-        if (!File.Exists(weaverPath))
-        {
-            throw new Exception("Couldn't find the weaver");
-        }
-
-        DirectoryInfo scriptRootDirInfo = new DirectoryInfo(Program.GetScriptFolder());
-        return Weave(scriptRootDirInfo, weaverPath);
-    }
-    
-    private bool Weave(DirectoryInfo scriptFolder, string weaverPath)
-    {
-        List<FileInfo> allProjectFiles = Program.GetAllProjectFiles(scriptFolder);
-        if (allProjectFiles.Count == 0)
+        var files = _context.Paths.GetWeavableProjectFiles();
+        if (files.Count == 0)
         {
             Console.WriteLine("No project files found. Skipping weaving...");
             return true;
         }
-        
-        BuildToolProcess weaveProcess = new BuildToolProcess();
-        weaveProcess.StartInfo.AddPath(weaverPath);
-        weaveProcess.StartInfo.WorkingDirectory = Directory.GetCurrentDirectory();
-        
-        bool foundValidProject = false;
-        foreach (FileInfo projectFile in allProjectFiles)
+
+        var paths = new HashSet<string>();
+
+        foreach (var projectFile in files)
         {
-            weaveProcess.StartInfo.ArgumentList.Add("-p");
-            string csProjName = Path.GetFileNameWithoutExtension(projectFile.Name);
-            string assemblyPath = Path.Combine(projectFile.DirectoryName!, "bin", 
-                Program.GetBuildConfiguration(), Program.GetVersion(), csProjName + ".dll");
-            
-            weaveProcess.StartInfo.AddPath(assemblyPath);
-            foundValidProject = true;
+
+            FileInfo assemblyFile = _context.Paths.GetScriptProjectAssemblyFile(projectFile);
+
+            if (!assemblyFile.Exists)
+            {
+                Console.WriteLine($"Assembly {assemblyFile.FullName} does not exist. Skipping weaving for this project.");
+                continue;
+            }
+
+            paths.Add(assemblyFile.FullName);
         }
-        
-        if (!foundValidProject)
+
+        if (paths.Count == 0)
         {
-            Console.WriteLine("No valid project found to weave. Skipping weaving...");
+            _context.Logger.Warning("No valid projects found to weave. Skipping weaving...");
             return true;
         }
 
-        // Add path to the output folder for the weaver.
-        weaveProcess.StartInfo.ArgumentList.Add("-o");
-        weaveProcess.StartInfo.AddPath(_outputDirectory);        
-        return weaveProcess.StartBuildToolProcess();
+        var weaveOptions = new WeaverOptions
+        {
+            AssemblyPaths = paths,
+            OutputDirectory = _context.Paths.GetManagedBinariesPublishDirectory().FullName
+        };
+        
+        var context = new WeaverContext(weaveOptions, _context.Logger);
+        var weaver = new Weaver(context);
+        try
+        {
+            weaver.Run();
+            return true;
+        }
+        catch (Exception e)
+        {
+            _context.Logger.Error($"Weaving failed: {e.Message}");
+            return false;
+        }
     }
+
 }

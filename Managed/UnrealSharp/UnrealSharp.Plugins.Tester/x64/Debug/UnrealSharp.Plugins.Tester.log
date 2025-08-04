@@ -1,0 +1,4 @@
+﻿  main.cpp
+P:\UnrealProjects\Beacon\Plugins\UnrealSharp\Managed\UnrealSharp\UnrealSharp.Plugins.Tester\main.cpp(201,44): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+main.obj : error LNK2019: unresolved external symbol get_hostfxr_path referenced in function "bool __cdecl `anonymous namespace'::load_hostfxr(wchar_t const *)" (?load_hostfxr@?A0x51447331@@YA_NPEB_W@Z)
+P:\UnrealProjects\Beacon\Plugins\UnrealSharp\Managed\UnrealSharp\x64\Debug\UnrealSharp.Plugins.Tester.exe : fatal error LNK1120: 1 unresolved externals

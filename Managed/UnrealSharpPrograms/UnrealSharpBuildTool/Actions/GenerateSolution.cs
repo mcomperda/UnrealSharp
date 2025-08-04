@@ -1,10 +1,10 @@
 ﻿namespace UnrealSharpBuildTool.Actions;
 
-public class GenerateSolution : BuildToolAction
+public class GenerateSolution(BuildToolContext ctx) : BuildToolAction(ctx)
 {
-    public override bool RunAction()
+    protected override bool DoRunAction()
     {
-        BuildToolProcess generateSln = new BuildToolProcess();
+        BuildToolProcess generateSln = new BuildToolProcess(_context);
         
         // Create a solution.
         generateSln.StartInfo.ArgumentList.Add("new");
@@ -12,23 +12,23 @@ public class GenerateSolution : BuildToolAction
         
         // Assign project name to the solution.
         generateSln.StartInfo.ArgumentList.Add("-n");
-        generateSln.StartInfo.ArgumentList.Add(Program.GetProjectNameAsManaged());
-        generateSln.StartInfo.WorkingDirectory = Program.GetScriptFolder();
+        generateSln.StartInfo.ArgumentList.Add(ctx.Paths.ScriptSolutionName);
+        generateSln.StartInfo.WorkingDirectory = ctx.Paths.ScriptDirectory.FullName;
         
         // Force the creation of the solution.
         generateSln.StartInfo.ArgumentList.Add("--force");
         generateSln.StartBuildToolProcess();
         
-        string[] existingProjects = Directory.GetFiles(Program.GetScriptFolder(), "*.csproj", SearchOption.AllDirectories);
-        List<string> existingProjectsList = new List<string>(existingProjects.Length);
+        var existingProjects = _context.Paths.ScriptDirectory.GetFiles("*.csproj", SearchOption.AllDirectories);
+        var existingProjectsList = new HashSet<string>();
         
-        foreach (string project in existingProjects)
-        {
-            string relativePath = Path.GetRelativePath(Program.GetScriptFolder(), project);
+        foreach (var projectFile in existingProjects)
+        {            
+            string relativePath = Path.GetRelativePath(_context.Paths.ScriptDirectory.FullName, projectFile.FullName);
             existingProjectsList.Add(relativePath);
         }
         
-        GenerateProject.AddProjectToSln(existingProjectsList);
+        GenerateProject.AddProjectsToSln(_context, existingProjectsList);
         return true;
     }
 }

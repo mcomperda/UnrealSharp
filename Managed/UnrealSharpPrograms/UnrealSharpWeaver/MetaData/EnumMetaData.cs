@@ -7,7 +7,7 @@ public class EnumMetaData : TypeReferenceMetadata
 {
     public List<string> Items { get; set; }
 
-    public EnumMetaData(TypeDefinition enumType) : base(enumType, TypeDefinitionUtilities.UEnumAttribute)
+    public EnumMetaData(WeaverImporter importer, TypeDefinition enumType) : base(importer, enumType, TypeDefinitionUtilities.UEnumAttribute)
     {
         Items = new List<string>();
         

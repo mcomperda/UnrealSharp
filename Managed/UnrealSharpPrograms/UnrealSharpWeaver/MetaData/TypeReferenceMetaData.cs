@@ -11,7 +11,7 @@ public class TypeReferenceMetadata : BaseMetaData
     public readonly TypeReference TypeRef;
     // End non-serialized
     
-    public TypeReferenceMetadata(TypeReference member, string attributeName = "") : base(member, attributeName)
+    public TypeReferenceMetadata(WeaverImporter importer, TypeReference member, string attributeName = "") : base(importer, member, attributeName)
     {
         AssemblyName = member.Module.Assembly.Name.Name;
         Namespace = member.Namespace;

@@ -2,4 +2,4 @@
 
 namespace UnrealSharpWeaver.NativeTypes;
 
-class NativeDataTextType(TypeReference textType) : NativeDataSimpleType(textType, "TextMarshaller", 1, PropertyType.Text);
+class NativeDataTextType(WeaverImporter importer, TypeReference textType) : NativeDataSimpleType(importer, textType, "TextMarshaller", 1, PropertyType.Text);

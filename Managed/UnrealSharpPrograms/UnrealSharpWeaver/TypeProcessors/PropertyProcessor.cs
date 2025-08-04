@@ -7,9 +7,9 @@ using UnrealSharpWeaver.Utilities;
 
 namespace UnrealSharpWeaver.TypeProcessors;
 
-public static class PropertyProcessor
+public class PropertyProcessor(WeaverImporter importer) : BaseProcessor(importer)
 {
-    public static void ProcessClassMembers(
+    public void ProcessClassMembers(
         ref List<Tuple<FieldDefinition, PropertyMetaData>> propertyOffsetsToInitialize,
         ref List<Tuple<FieldDefinition, PropertyMetaData>> propertyPointersToInitialize,
         TypeDefinition type,
@@ -24,8 +24,8 @@ public static class PropertyProcessor
                 continue;
             }
             
-            FieldDefinition offsetField = AddOffsetField(type, prop, WeaverImporter.Instance.Int32TypeRef);
-            FieldDefinition? nativePropertyField = AddNativePropertyField(type, prop, WeaverImporter.Instance.IntPtrType);
+            FieldDefinition offsetField = AddOffsetField(type, prop, _importer.Int32TypeRef);
+            FieldDefinition? nativePropertyField = AddNativePropertyField(type, prop, _importer.IntPtrType);
             
             propertyOffsetsToInitialize.Add(Tuple.Create(offsetField, prop));
             
@@ -42,7 +42,7 @@ public static class PropertyProcessor
             
             prop.PropertyDataType.PrepareForRewrite(type, prop, prop.MemberRef);
 
-            Instruction[] loadBuffer = NativeDataType.GetArgumentBufferInstructions(null, offsetField);
+            Instruction[] loadBuffer = NativeDataType.GetArgumentBufferInstructions(_importer, null, offsetField);
             
             if (prop.MemberRef.Resolve() is PropertyDefinition propertyRef)
             {
@@ -62,7 +62,7 @@ public static class PropertyProcessor
         RemoveBackingFieldReferences(type, removedBackingFields);
     }
     
-    private static void RemoveBackingFieldReferences(TypeDefinition type, Dictionary<string, (PropertyMetaData, PropertyDefinition, FieldDefinition, FieldDefinition?)> strippedFields)
+    private void RemoveBackingFieldReferences(TypeDefinition type, Dictionary<string, (PropertyMetaData, PropertyDefinition, FieldDefinition, FieldDefinition?)> strippedFields)
     {
         foreach (MethodDefinition? method in type.GetConstructors())
         {
@@ -122,7 +122,7 @@ public static class PropertyProcessor
                     else
                     {
                         // Standard property handling
-                        Instruction[] loadBuffer = NativeDataType.GetArgumentBufferInstructions(null, prop.offsetField);
+                        Instruction[] loadBuffer = NativeDataType.GetArgumentBufferInstructions(_importer, null, prop.offsetField);
                         prop.meta.PropertyDataType.WriteSetter(type, prop.def.SetMethod, loadBuffer, prop.nativePropertyField);
                     }
                 }
@@ -200,7 +200,7 @@ public static class PropertyProcessor
         }
     }
 
-    private static string RemovePropertyBackingField(TypeDefinition type, PropertyMetaData prop)
+    private string RemovePropertyBackingField(TypeDefinition type, PropertyMetaData prop)
     {
         string backingFieldName = $"<{prop.Name}>k__BackingField";
 
@@ -218,7 +218,7 @@ public static class PropertyProcessor
         throw new InvalidDataException($"Property '{prop.Name}' does not have a backing field");
     }
 
-    public static FieldDefinition AddOffsetField(TypeDefinition type, PropertyMetaData prop, TypeReference int32TypeRef)
+    public FieldDefinition AddOffsetField(TypeDefinition type, PropertyMetaData prop, TypeReference int32TypeRef)
     {
         var field = new FieldDefinition(prop.Name + "_Offset",
             FieldAttributes.Static | FieldAttributes.Private, int32TypeRef);
@@ -226,7 +226,7 @@ public static class PropertyProcessor
         return field;
     }
 
-    public static FieldDefinition? AddNativePropertyField(TypeDefinition type, PropertyMetaData prop, TypeReference intPtrTypeRef)
+    public FieldDefinition? AddNativePropertyField(TypeDefinition type, PropertyMetaData prop, TypeReference intPtrTypeRef)
     {
         if (!prop.PropertyDataType.NeedsNativePropertyField)
         {
@@ -238,12 +238,12 @@ public static class PropertyProcessor
         return field;
     }
 
-    public static bool IsLdconst(Instruction ldconst)
+    public bool IsLdconst(Instruction ldconst)
     {
         return ldconst.OpCode.Op1 == 0xff && ldconst.OpCode.Op2 >= 0x15 && ldconst.OpCode.Op2 <= 0x23;
     }
 
-    public static void CopyLastElements(List<Instruction> from, List<Instruction> to, int count)
+    public void CopyLastElements(List<Instruction> from, List<Instruction> to, int count)
     {
         int startIdx = from.Count - count;
         for (int i = startIdx; i < startIdx + count; i++)

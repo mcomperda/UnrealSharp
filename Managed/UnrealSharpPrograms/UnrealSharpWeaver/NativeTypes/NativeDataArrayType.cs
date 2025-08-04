@@ -2,8 +2,8 @@ using Mono.Cecil;
 
 namespace UnrealSharpWeaver.NativeTypes;
 
-class NativeDataArrayType(TypeReference typeRef, int containerDim, TypeReference innerType) 
-    : NativeDataContainerType(typeRef, containerDim, PropertyType.Array, innerType)
+class NativeDataArrayType(WeaverImporter importer, TypeReference typeRef, int containerDim, TypeReference innerType) 
+    : NativeDataContainerType(importer, typeRef, containerDim, PropertyType.Array, innerType)
 {
     public override string GetContainerMarshallerName()
     {

@@ -22,22 +22,23 @@ public class PropertyMetaData : BaseMetaData
     public FieldDefinition? PropertyOffsetField;
     public FieldDefinition? NativePropertyField;
     public readonly MemberReference? MemberRef;
+    
     public bool IsOutParameter => (PropertyFlags & PropertyFlags.OutParm) == PropertyFlags.OutParm;
     public bool IsReferenceParameter => (PropertyFlags & PropertyFlags.ReferenceParm) == PropertyFlags.ReferenceParm;
     public bool IsReturnParameter => (PropertyFlags & PropertyFlags.ReturnParm) == PropertyFlags.ReturnParm;
     public bool IsInstancedReference => (PropertyFlags & PropertyFlags.InstancedReference) == PropertyFlags.InstancedReference;
     // End non-serialized
     
-    private PropertyMetaData(MemberReference memberRef) : base(memberRef, PropertyUtilities.UPropertyAttribute)
+    private PropertyMetaData(WeaverImporter importer, MemberReference memberRef) : base(importer, memberRef, PropertyUtilities.UPropertyAttribute)
     {
-
+        
     }
 
-    private PropertyMetaData(TypeReference typeRef, string paramName, ParameterType modifier) : this(typeRef)
+    private PropertyMetaData(WeaverImporter importer, TypeReference typeRef, string paramName, ParameterType modifier) : this(importer, typeRef)
     {
         MemberRef = typeRef;
         Name = paramName;
-        PropertyDataType = typeRef.GetDataType(paramName, null);
+        PropertyDataType = _importer.GetDataType(typeRef, paramName);
         
         PropertyFlags flags = PropertyFlags.None;
         
@@ -62,7 +63,7 @@ public class PropertyMetaData : BaseMetaData
         PropertyFlags = flags;
     }
 
-    public PropertyMetaData(PropertyDefinition property) : this((MemberReference) property)
+    public PropertyMetaData(WeaverImporter importer, PropertyDefinition property) : this(importer, (MemberReference) property)
     {
         MemberRef = property;
         
@@ -97,8 +98,8 @@ public class PropertyMetaData : BaseMetaData
         else
         {
             // Register custom accessors as UFunctions if they have BlueprintGetter/Setter specified
-            RegisterPropertyAccessorAsUFunction(property.GetMethod, true);
-            RegisterPropertyAccessorAsUFunction(property.SetMethod, false);
+            RegisterPropertyAccessorAsUFunction(importer, property.GetMethod, true);
+            RegisterPropertyAccessorAsUFunction(importer, property.SetMethod, false);
         }
         
         if (getter.IsPrivate && PropertyFlags.HasFlag(PropertyFlags.BlueprintVisible))
@@ -112,7 +113,7 @@ public class PropertyMetaData : BaseMetaData
         Initialize(property, property.PropertyType);
     }
 
-    public PropertyMetaData(FieldDefinition property) : this((MemberReference) property)
+    public PropertyMetaData(WeaverImporter importer, FieldDefinition property) : this(importer, (MemberReference) property)
     {
         MemberRef = property;
         Initialize(property, property.FieldType);
@@ -121,7 +122,7 @@ public class PropertyMetaData : BaseMetaData
     private void Initialize(IMemberDefinition property, TypeReference propertyType)
     {
         Name = property.Name;
-        PropertyDataType = propertyType.GetDataType(property.FullName, property.CustomAttributes);
+        PropertyDataType = _importer.GetDataType(propertyType, property.FullName, property.CustomAttributes);
         PropertyFlags flags = (PropertyFlags) GetFlags(property, "PropertyFlagsMapAttribute");
         
         CustomAttribute? upropertyAttribute = property.GetUProperty();
@@ -152,7 +153,7 @@ public class PropertyMetaData : BaseMetaData
         if (notifyMethodArgument.HasValue)
         {
             string notifyMethodName = (string) notifyMethodArgument.Value.Value;
-            MethodReference? notifyMethod = property.DeclaringType.FindMethod(notifyMethodName);
+            MethodReference? notifyMethod = property.DeclaringType.FindMethod(_importer, notifyMethodName);
             
             if (notifyMethod == null)
             {
@@ -219,23 +220,23 @@ public class PropertyMetaData : BaseMetaData
     {
         processor.Append(loadNativeType);
         processor.Emit(OpCodes.Ldstr, Name);
-        processor.Emit(OpCodes.Call, WeaverImporter.Instance.GetNativePropertyFromNameMethod);
+        processor.Emit(OpCodes.Call, _importer.GetNativePropertyFromNameMethod);
         processor.Append(setPropertyPointer);
     }
     
     public void InitializePropertyOffsets(ILProcessor processor, Instruction loadNativeType)
     {
         processor.Append(loadNativeType);
-        processor.Emit(OpCodes.Call, WeaverImporter.Instance.GetPropertyOffset);
+        processor.Emit(OpCodes.Call, _importer.GetPropertyOffset);
         processor.Emit(OpCodes.Stsfld, PropertyOffsetField);
     }
     
-    public static PropertyMetaData FromTypeReference(TypeReference typeRef, string paramName, ParameterType modifier = ParameterType.None)
+    public static PropertyMetaData FromTypeReference(WeaverImporter importer, TypeReference typeRef, string paramName, ParameterType modifier = ParameterType.None)
     {
-        return new PropertyMetaData(typeRef, paramName, modifier);
+        return new PropertyMetaData(importer, typeRef, paramName, modifier);
     }
     
-    private void RegisterPropertyAccessorAsUFunction(MethodDefinition accessorMethod, bool isGetter)
+    private void RegisterPropertyAccessorAsUFunction(WeaverImporter importer, MethodDefinition accessorMethod, bool isGetter)
     {
         if (accessorMethod == null)
         {
@@ -255,15 +256,15 @@ public class PropertyMetaData : BaseMetaData
         // Add UFunction attribute if not already present
         if (!accessorMethod.IsUFunction())
         {
-            var ufunctionCtor = WeaverImporter.Instance.UserAssembly.MainModule.ImportReference(
-                WeaverImporter.Instance.UFunctionAttributeConstructor);
+            var ufunctionCtor = _importer.UserAssembly.MainModule.ImportReference(
+                _importer.UFunctionAttributeConstructor);
 
             // Create constructor arguments array
             var ctorArgs = new[]
             {
                 // First argument - FunctionFlags (combine BlueprintCallable with BlueprintPure for getters)
                 new CustomAttributeArgument(
-                    WeaverImporter.Instance.UInt64TypeRef,
+                    _importer.UInt64TypeRef,
                     (ulong)(isGetter 
                         ? EFunctionFlags.BlueprintCallable | EFunctionFlags.BlueprintPure 
                         : EFunctionFlags.BlueprintCallable))
@@ -276,8 +277,8 @@ public class PropertyMetaData : BaseMetaData
 
             accessorMethod.CustomAttributes.Add(ufunctionAttribute);
             
-            var blueprintInternalUseOnlyCtor = WeaverImporter.Instance.UserAssembly.MainModule.ImportReference(
-                WeaverImporter.Instance.BlueprintInternalUseAttributeConstructor);
+            var blueprintInternalUseOnlyCtor = _importer.UserAssembly.MainModule.ImportReference(
+                _importer.BlueprintInternalUseAttributeConstructor);
             accessorMethod.CustomAttributes.Add(new CustomAttribute(blueprintInternalUseOnlyCtor));
         }
 

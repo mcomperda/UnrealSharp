@@ -10,6 +10,7 @@ using UnrealSharp.CoreUObject;
 using UnrealSharp.Editor.Interop;
 using UnrealSharp.Engine.Core.Modules;
 using UnrealSharp.Shared;
+using UnrealSharp.Tools;
 using UnrealSharpWeaver;
 
 namespace UnrealSharp.Editor;
@@ -152,7 +153,10 @@ public static class ManagedUnrealSharpEditorCallbacks
             OutputDirectory = new string(outputPath),
         };
 
-        Program.Weave(weaverOptions);
+        using var logger = new ToolLogger("weaver");
+        var context = new WeaverContext(weaverOptions, logger);
+        var weaver = new Weaver(context);
+        weaver.Run();
     }
     
     [UnmanagedCallersOnly]

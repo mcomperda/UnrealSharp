@@ -5,13 +5,14 @@ namespace UnrealSharpWeaver.Utilities;
 
 public static class AssemblyUtilities
 {
-    public static TypeReference? FindGenericType(this AssemblyDefinition assembly, string typeNamespace, string typeName, TypeReference[] typeParameters, bool bThrowOnException = true)
+    public static TypeReference? FindGenericType(this AssemblyDefinition assembly, WeaverImporter importer, string typeNamespace, string typeName, TypeReference[] typeParameters, bool bThrowOnException = true)
     {
-        TypeReference? typeRef = FindType(assembly, typeName, typeNamespace, bThrowOnException);
-        return typeRef == null ? null : typeRef.Resolve().MakeGenericInstanceType(typeParameters).ImportType();
+        TypeReference? typeRef = FindType(assembly, importer, typeName, typeNamespace, bThrowOnException);
+        return typeRef == null ? null : typeRef.Resolve().MakeGenericInstanceType(typeParameters).ImportType(importer);
     }
 
-    public static TypeReference? FindType(this AssemblyDefinition assembly, string typeName, string typeNamespace = "", bool throwOnException = true)
+
+    public static TypeReference? FindType(this AssemblyDefinition assembly, WeaverImporter importer, string typeName, string typeNamespace = "", bool throwOnException = true)
     {
         foreach (var module in assembly.Modules)
         {
@@ -22,7 +23,7 @@ public static class AssemblyUtilities
                     continue;
                 }
                 
-                return type.ImportType();
+                return type.ImportType(importer);
             }
         }
 
@@ -46,14 +47,14 @@ public static class AssemblyUtilities
         return newType;
     }
     
-    public static void ForEachAssembly(Func<AssemblyDefinition, bool> action)
+    public static void ForEachAssembly(WeaverImporter importer, Func<AssemblyDefinition, bool> action)
     {
-        List<AssemblyDefinition> assemblies = [WeaverImporter.Instance.UnrealSharpAssembly, 
-            WeaverImporter.Instance.UnrealSharpCoreAssembly, 
-            WeaverImporter.Instance.UserAssembly, 
-            WeaverImporter.Instance.ProjectGlueAssembly];
+        List<AssemblyDefinition> assemblies = [importer.UnrealSharpAssembly,
+            importer.UnrealSharpCoreAssembly,
+            importer.UserAssembly,
+            importer.ProjectGlueAssembly];
         
-        assemblies.AddRange(WeaverImporter.Instance.WeavedAssemblies);
+        assemblies.AddRange(importer.WeavedAssemblies);
         
         foreach (AssemblyDefinition assembly in assemblies)
         {

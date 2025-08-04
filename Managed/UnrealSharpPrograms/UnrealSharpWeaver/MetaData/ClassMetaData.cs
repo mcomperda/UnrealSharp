@@ -17,11 +17,12 @@ public class ClassMetaData : TypeReferenceMetadata
     
     // Non-serialized for JSON
     public bool HasProperties => Properties.Count > 0;
-    private readonly TypeDefinition _classDefinition;
-    // End non-serialized
+    private readonly TypeDefinition _classDefinition;    
     
-    public ClassMetaData(TypeDefinition type) : base(type, TypeDefinitionUtilities.UClassAttribute)
-    {
+    // End non-serialized
+
+    public ClassMetaData(WeaverImporter importer, TypeDefinition type) : base(importer, type, TypeDefinitionUtilities.UClassAttribute)
+    {                
         _classDefinition = type;
         
         Properties = [];
@@ -37,7 +38,7 @@ public class ClassMetaData : TypeReferenceMetadata
         
         AddConfigCategory();
         
-        ParentClass = new TypeReferenceMetadata(type.BaseType.Resolve());
+        ParentClass = new TypeReferenceMetadata(importer, type.BaseType.Resolve());
         ClassFlags |= GetClassFlags(type, AttributeName) | ClassFlags.CompiledFromBlueprint;
         
         // Force DefaultConfig if Config is set and no other config flag is set
@@ -47,7 +48,7 @@ public class ClassMetaData : TypeReferenceMetadata
             ClassFlags |= ClassFlags.DefaultConfig;
         }
 
-        if (type.IsChildOf(WeaverImporter.Instance.UActorComponentDefinition))
+        if (type.IsChildOf(_importer.UActorComponentDefinition))
         {
             TryAddMetaData("BlueprintSpawnableComponent", true);
         }
@@ -81,7 +82,7 @@ public class ClassMetaData : TypeReferenceMetadata
                 continue;
             }
             
-            PropertyMetaData propertyMetaData = new PropertyMetaData(property);
+            PropertyMetaData propertyMetaData = new PropertyMetaData(_importer, property);
             Properties.Add(propertyMetaData);
                 
             if (propertyMetaData.IsInstancedReference)
@@ -107,7 +108,7 @@ public class ClassMetaData : TypeReferenceMetadata
 
             if (FunctionMetaData.IsAsyncUFunction(method))
             {
-                FunctionProcessor.RewriteMethodAsAsyncUFunctionImplementation(method);
+                _importer.FunctionProcessor.RewriteMethodAsAsyncUFunctionImplementation(method);
                 continue;
             }
             
@@ -121,7 +122,7 @@ public class ClassMetaData : TypeReferenceMetadata
                     throw new Exception($"{method.FullName} is a Blueprint override and cannot be marked as a UFunction again.");
                 }
                 
-                FunctionMetaData functionMetaData = new FunctionMetaData(method);
+                FunctionMetaData functionMetaData = new FunctionMetaData(_importer, method);
                 
                 if (isInterfaceFunction && functionMetaData.FunctionFlags.HasFlag(EFunctionFlags.BlueprintNativeEvent))
                 {
@@ -140,7 +141,7 @@ public class ClassMetaData : TypeReferenceMetadata
                     functionFlags = interfaceFunction.GetFunctionFlags();
                 }
                 
-                VirtualFunctions.Add(new FunctionMetaData(method, false, functionFlags));
+                VirtualFunctions.Add(new FunctionMetaData(_importer, method, false, functionFlags));
             }
         }
     }
@@ -163,12 +164,12 @@ public class ClassMetaData : TypeReferenceMetadata
         {
             TypeDefinition interfaceType = typeInterface.InterfaceType.Resolve();
 
-            if (interfaceType == WeaverImporter.Instance.IInterfaceType || !interfaceType.IsUInterface())
+            if (interfaceType == _importer.IInterfaceType || !interfaceType.IsUInterface())
             {
                 continue;
             }
             
-            Interfaces.Add(new TypeReferenceMetadata(interfaceType));
+            Interfaces.Add(new TypeReferenceMetadata(_importer, interfaceType));
         }
     }
     

@@ -2,11 +2,5 @@
 
 namespace UnrealSharpBuildTool.Actions;
 
-public class BuildUserSolution : BuildSolution
-{
-    public BuildUserSolution(Collection<string>? extraArguments = null, BuildConfig buildConfig = BuildConfig.Debug) 
-        : base(Program.GetScriptFolder(), extraArguments, buildConfig)
-    {
-        
-    }
-}
+public class BuildUserSolution(BuildToolContext ctx, Collection<string>? extraArguments = null, BuildConfig buildConfig = BuildConfig.Debug) 
+    : BuildSolution(ctx, ctx.Paths.ScriptDirectory, extraArguments, buildConfig);

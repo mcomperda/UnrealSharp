@@ -4,9 +4,9 @@ using UnrealSharpWeaver.Utilities;
 
 namespace UnrealSharpWeaver.NativeTypes;
 
-class NativeDataEnumType(TypeReference typeRef, int arrayDim) : NativeDataSimpleType(typeRef, "EnumMarshaller`1", arrayDim, PropertyType.Enum)
+class NativeDataEnumType(WeaverImporter importer, TypeReference typeRef, int arrayDim) : NativeDataSimpleType(importer, typeRef, "EnumMarshaller`1", arrayDim, PropertyType.Enum)
 {
-    public TypeReferenceMetadata InnerProperty { get; set; } = new(typeRef.Resolve());
+    public TypeReferenceMetadata InnerProperty { get; set; } = new(importer, typeRef.Resolve());
 
     public override void PrepareForRewrite(TypeDefinition typeDefinition,
         PropertyMetaData propertyMetadata, object outer)

@@ -1,0 +1,7 @@
+2025-08-03 21:22:54.908 -05:00 [INF] Logger initialized
+2025-08-03 21:22:54.916 -05:00 [INF] Using .NET SDK: 'C:\Program Files\dotnet\sdk\9.0.303'
+2025-08-03 21:22:54.916 -05:00 [INF] Working directory: 'C:\Path\To\Your\WorkingDirectory'
+2025-08-03 21:22:54.917 -05:00 [INF] Creating plugin callbacks...
+2025-08-03 21:22:58.478 -05:00 [ERR] Error creating plugin callbacks: Object reference not set to an instance of an object.
+2025-08-03 21:22:59.049 -05:00 [INF] UnrealSharp plugin is shutting down.
+2025-08-03 21:22:59.050 -05:00 [INF] Logger shutting down
